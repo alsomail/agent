@@ -1,0 +1,9 @@
+pre-commit:
+  parallel: true
+  commands:
+    lint:
+      glob: "*.{ts,tsx,js,jsx,json}"
+      run: npx biome check --write {staged_files}
+    typecheck:
+      glob: "*.{ts,tsx}"
+      run: pnpm -r run typecheck

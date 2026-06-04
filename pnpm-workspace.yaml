@@ -1,0 +1,8 @@
+packages:
+  - "app/protocol"
+  - "app/service"
+  - "app/web"
+allowBuilds:
+  '@biomejs/biome': true
+  esbuild: true
+  lefthook: true
