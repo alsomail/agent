@@ -9,8 +9,10 @@
 | 文件 | 职责 |
 |------|------|
 | `agent-state.ts` | Agent 状态枚举 (`idle`, `streaming`, `tool_executing`, `completed`, `error`, `aborted`) |
-| `session.ts` | 会话相关 Schema：创建会话请求、会话信息结构 |
-| `message.ts` | 消息相关 Schema：内容块（文本/工具调用/工具结果）、消息结构、聊天请求 |
+| `api.ts` | API 统一响应信封 (`{ success, data?, error? }`)，错误码枚举 |
+| `health.ts` | 健康检查响应格式 |
+| `session.ts` | 会话相关 Schema：创建会话请求（含 model/provider）、会话信息结构 |
+| `message.ts` | 消息相关 Schema：内容块（文本/工具调用/工具结果）、消息结构、发送消息请求 |
 | `stream-event.ts` | SSE 流事件 Schema：客户端接收的所有事件类型定义 |
 | `tool.ts` | 工具相关 Schema：工具定义、工具调用、工具结果 |
 
@@ -28,26 +30,31 @@
 
 ## API 端点
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| `GET` | `/api/health` | 健康检查 |
-| `POST` | `/api/session` | 创建会话 |
-| `GET` | `/api/session/:id` | 获取会话信息 |
-| `DELETE` | `/api/session/:id` | 终止会话 |
-| `POST` | `/api/session/:id/chat` | SSE 流式聊天 |
+| 方法 | 路径 | 请求/响应 |
+|------|------|-----------|
+| `GET` | `/api/health` | 响应: `HealthResponse { status, uptime, timestamp }` |
+| `POST` | `/api/session` | 请求: `CreateSessionRequest { systemPrompt?, model?, provider? }` / 响应: `Session` |
+| `GET` | `/api/session/:id` | 响应: `Session` |
+| `DELETE` | `/api/session/:id` | 响应: `null` |
+| `POST` | `/api/session/:id/chat` | 请求: `SendMessageRequest { content: string }` / 响应: SSE 流 (`StreamEvent`) |
+
+所有端点返回统一信封格式：
+- 成功: `{ success: true, data: T }`
+- 失败: `{ success: false, error: { code: ErrorCode, message: string } }`
 
 ## 使用方式
 
 ### 后端（@myagent/service）
 
 ```typescript
-import { CreateSessionRequestSchema } from "@myagent/protocol";
+import { CreateSessionRequestSchema, SendMessageRequestSchema } from "@myagent/protocol";
+import type { ApiErrorResponse, Session } from "@myagent/protocol";
 // 配合 @hono/zod-validator 进行请求校验
 ```
 
 ### 前端
 
 ```typescript
-import type { StreamEvent, Session, Message } from "@myagent/protocol";
+import type { StreamEvent, Session, Message, HealthResponse } from "@myagent/protocol";
 // 类型安全地处理 SSE 事件和 API 响应
 ```

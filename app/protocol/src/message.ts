@@ -1,6 +1,7 @@
 import { z } from "zod";
 
-// 内容块类型
+// ─── 内容块类型 ───
+
 export const TextContentBlockSchema = z.object({
   type: z.literal("text"),
   text: z.string(),
@@ -26,23 +27,19 @@ export const ContentBlockSchema = z.discriminatedUnion("type", [
   ToolResultContentBlockSchema,
 ]);
 
-// 消息
+// ─── 消息 ───
+
 export const MessageSchema = z.object({
   role: z.enum(["user", "assistant"]),
   content: z.array(ContentBlockSchema),
 });
 
-// 发送消息请求
+// ─── 请求 ───
+
+// Phase 1: 客户端发送聊天消息到 POST /api/session/:id/chat
+// 只需要 content 字段 — 服务端负责维护会话历史和构建完整 messages 数组
 export const SendMessageRequestSchema = z.object({
   content: z.string().min(1).max(32000),
-});
-
-// 聊天请求
-export const ChatRequestSchema = z.object({
-  messages: z.array(MessageSchema),
-  model: z.string().optional(),
-  maxTokens: z.number().optional(),
-  system: z.string().optional(),
 });
 
 export type TextContentBlock = z.infer<typeof TextContentBlockSchema>;
@@ -51,4 +48,3 @@ export type ToolResultContentBlock = z.infer<typeof ToolResultContentBlockSchema
 export type ContentBlock = z.infer<typeof ContentBlockSchema>;
 export type Message = z.infer<typeof MessageSchema>;
 export type SendMessageRequest = z.infer<typeof SendMessageRequestSchema>;
-export type ChatRequest = z.infer<typeof ChatRequestSchema>;

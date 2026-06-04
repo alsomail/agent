@@ -99,14 +99,45 @@ import { foo } from "./utils.js";
 ### 11. 文档同步
 新增功能时必须更新对应的 Phase 文档（`doc/phases/`），标记完成项。
 
-## 项目结构约定
+## 项目结构与目录职责
+
+### app/ — 源码目录
+
+| 目录 | 作用 | 关键规则 |
+|------|------|---------|
+| `app/protocol/src/` | 前后端共享的 Zod Schemas，是数据契约的**唯一真相源** | 新增 API 端点必须先在此定义 Schema；两端都从这里 import 类型 |
+| `app/service/src/` | Hono 后端：路由、手写 LLM 集成层、Agent 逻辑、工具系统 | LLM Provider 的内部类型（NormalizedStreamEvent 等）在此定义，不在 protocol 中 |
+| `app/web/src/` | React + Vite 前端：聊天 UI、SSE 流消费、状态管理 | 从 `@myagent/protocol` 导入类型，不自行定义重复类型 |
+| `app/codegen.sh` | 协议代码生成脚本（build/generate/clean/validate） | 修改 protocol 后运行 `./app/codegen.sh build` 重新编译 |
+| `app/dev.sh` | 一键启动两端开发服务器 | — |
+
+### doc/ — 文档目录
+
+| 目录 | 作用 | 内容定位 |
+|------|------|---------|
+| `doc/architecture/` | 技术架构决策文档 | 选型理由、分层设计、数据流图、LLM 集成层架构。回答"为什么这样设计" |
+| `doc/phases/` | 分阶段学习与实现路径 | 每个 Phase 的目标、模块清单、伪代码、验证清单。回答"实现什么、怎么实现" |
+| `doc/references/` | 外部 API 参考文档 | Anthropic API 规范等，供离线查阅。不是项目自己的设计，是依赖的外部规范 |
+| `doc/guides/` | 运行指南与环境配置 | 开发环境搭建、启动方式、API 密钥配置 |
+| `doc/README.md` | 文档总入口 | 项目背景 + 所有文档目录的索引 |
+
+### 文档唯一性原则
+
+- **不要复制内容**：Phase 文档引用 architecture 文档（用相对链接），不把架构设计复制一遍
+- **architecture/ 回答"为什么"**，phases/ 回答"做什么"，references/ 回答"外部怎么规定"
+- **protocol/ 是代码中的契约**，protocol/index.md 是对它的说明文档
+
+### 代码类型的分层
 
 ```
-app/protocol/src/   → 前后端共享的 Zod schemas
-app/service/src/    → 后端（Hono + 手写 LLM 层）
-app/web/src/        → 前端（React + Vite）
-doc/                → 文档（设计、学习笔记、指南）
+@myagent/protocol   → 前后端共享类型（客户端能看到的 SSE 事件、REST API 请求/响应）
+service/llm/types/  → 服务端内部类型（NormalizedStreamEvent、LLMProvider 接口）
+                       前端永远不会 import 这些类型
 ```
+
+两层类型的映射关系：
+- `NormalizedStreamEvent`（服务端内部）→ 经过 relay 翻译 → `StreamEvent`（protocol，客户端可见）
+- `NormalizedMessage`（服务端内部）→ 经过 mapper 转换 → Anthropic/OpenAI API 格式
 
 ## 技术栈
 

@@ -1,4 +1,6 @@
 export * from "./agent-state.js";
+export * from "./api.js";
+export * from "./health.js";
 export * from "./session.js";
 export * from "./message.js";
 export * from "./stream-event.js";
