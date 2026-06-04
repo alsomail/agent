@@ -16,7 +16,7 @@ export function createApp(): Hono {
   // 路由
   app.route("/api/health", healthRoute);
   app.route("/api/session", sessionRoute);
-  app.route("/api/session/:id/chat", chatRoute);
+  app.route("/api/session", chatRoute);
 
   // 全局错误处理
   app.onError(errorHandler);

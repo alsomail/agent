@@ -2,11 +2,9 @@ import { zValidator } from "@hono/zod-validator";
 import { CreateSessionRequestSchema } from "@myagent/protocol";
 import type { Session } from "@myagent/protocol";
 import { Hono } from "hono";
+import { sessionStore, systemPromptStore } from "../store/session-store.js";
 
 export const sessionRoute = new Hono();
-
-// 内存存储（Phase 2 会改为持久化存储）
-const sessions = new Map<string, Session>();
 
 // POST /api/session - 创建会话
 sessionRoute.post("/", zValidator("json", CreateSessionRequestSchema), (c) => {
@@ -21,14 +19,20 @@ sessionRoute.post("/", zValidator("json", CreateSessionRequestSchema), (c) => {
     messageCount: 0,
     state: "idle",
   };
-  sessions.set(session.id, session);
+  sessionStore.set(session.id, session);
+
+  // 保存 systemPrompt 供后续 chat 使用
+  if (body.systemPrompt) {
+    systemPromptStore.set(session.id, body.systemPrompt);
+  }
+
   return c.json({ success: true as const, data: session }, 201);
 });
 
 // GET /api/session/:id - 获取会话
 sessionRoute.get("/:id", (c) => {
   const { id } = c.req.param();
-  const session = sessions.get(id);
+  const session = sessionStore.get(id);
   if (!session) {
     return c.json(
       {
@@ -44,7 +48,7 @@ sessionRoute.get("/:id", (c) => {
 // DELETE /api/session/:id - 终止会话
 sessionRoute.delete("/:id", (c) => {
   const { id } = c.req.param();
-  const session = sessions.get(id);
+  const session = sessionStore.get(id);
   if (!session) {
     return c.json(
       {
@@ -54,6 +58,7 @@ sessionRoute.delete("/:id", (c) => {
       404,
     );
   }
-  sessions.delete(id);
+  sessionStore.delete(id);
+  systemPromptStore.delete(id);
   return c.json({ success: true as const, data: null });
 });

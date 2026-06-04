@@ -37,3 +37,18 @@ body {
   display: flex;
   flex-direction: column;
 }
+
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+.cursor-blink {
+  animation: blink 0.8s infinite;
+  color: var(--color-accent);
+}
