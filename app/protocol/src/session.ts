@@ -2,15 +2,15 @@ import { z } from "zod";
 import { AgentStateEnum } from "./agent-state.js";
 
 // 支持的 LLM Provider
-export const LLMProviderEnum = z.enum(["anthropic", "openai"]);
+export const LLMProviderEnum = z.enum(["anthropic", "ollama", "openai"]);
 
-// 支持的模型（可扩展）
-export const ModelEnum = z.enum(["claude-sonnet-4-20250514", "claude-haiku-4-5-20251001"]);
+// 模型名（使用 z.string() 以支持 Ollama 等任意模型名，向后兼容之前的 enum 值）
+export const ModelNameSchema = z.string().min(1);
 
 // 创建会话请求
 export const CreateSessionRequestSchema = z.object({
   systemPrompt: z.string().optional(),
-  model: ModelEnum.default("claude-sonnet-4-20250514"),
+  model: ModelNameSchema.default("claude-sonnet-4-20250514"),
   provider: LLMProviderEnum.default("anthropic"),
 });
 

@@ -192,6 +192,27 @@ service 的 `dev` 脚本修改为：`tsx watch --env-file=../../.env src/index.t
 4. 返回 `new Response(stream, { headers: SSE headers })`
 5. 监听 `c.req.raw.signal` 的 abort 事件 → 取消上游 LLM 请求
 
+### 模块 10：Ollama Provider（`app/service/src/llm/providers/ollama/`）
+
+| 文件 | 职责 |
+|------|------|
+| `types.ts` | OllamaChatRequest, OllamaChunk, OllamaModelResponse |
+| `client.ts` | callOllamaChatStream (POST /api/chat) + listOllamaModels (GET /api/tags) |
+| `stream-parser.ts` | NDJSON 行解析 → NormalizedStreamEvent |
+| `index.ts` | 组装 createOllamaProvider() |
+
+Ollama 流式格式是 NDJSON（每行一个 JSON，`\n` 分割），与 Anthropic 的 SSE 完全不同。
+> 详细差异和归一化策略见 [LLM 架构 §6.1](../../architecture/llm-integration.md)
+
+### 模块 11：Provider 发现路由（`app/service/src/routes/provider.ts`）
+
+| 端点 | 说明 |
+|------|------|
+| GET /api/providers | 返回可用 Provider 列表 + 状态 |
+| GET /api/models?provider=ollama | 返回该 Provider 的模型列表 |
+
+Provider 发现和模型列表的 Schema 定义见 [协议索引](../../../app/protocol/index.md)。
+
 ---
 
 ## 五、Web 前端设计
@@ -244,6 +265,48 @@ App.tsx
 │       Enter 发送，Shift+Enter 换行
 │       streaming 时禁用输入和按钮
 ```
+
+### Provider/Model 选择器（新增）
+
+```
+App.tsx
+│
+├── components/chat/
+│   ├── ProviderSelector.tsx     ← 新增
+│   │   props: onSelect(providerId), selected |
+│   │   下拉选择 Ollama / Anthropic（仅当可用）
+│   │
+│   ├── ModelSelector.tsx        ← 新增
+│   │   props: provider, onSelect(modelName), selected
+│   │   动态拉取模型列表
+│   │
+│   ├── ChatContainer.tsx        ← 更新
+│   │   Header 集成 ProviderSelector + ModelSelector
+│   │
+│   └── ...（其他不变）
+```
+
+前端状态管理（useChat 更新）：
+
+```
+useChat:
+  新增状态:
+    providers: ProviderInfo[]     ← 可用 Provider 列表
+    selectedProvider: string      ← 当前选择的 Provider
+    models: ModelInfo[]           ← 当前 Provider 的模型列表
+    selectedModel: string         ← 当前选择的模型
+
+  新增行为:
+    fetchProviders()              ← 组件挂载时调用
+    selectProvider(id)            ← 切换 Provider → 重新拉取模型列表
+    send() 中：创建 session 携带 selectedProvider + selectedModel
+```
+
+实现要点：
+- 无 ANTHROPIC_API_KEY 时 UI 不显示 Anthropic 选项
+- 选 Ollama 后自动 GET /api/models?provider=ollama 拉取模型
+- Ollama 不可达时显示"Ollama 服务未运行，请先执行 ollama serve"
+- 选 Anthropic 时模型列表使用预设值（从 session schema 的枚举）
 
 ### 5.3 状态管理
 
@@ -309,6 +372,8 @@ useChat ──► ChatContainer
 | `src/components/chat/MessageBubble.tsx` | 单条消息渲染 | 新建 |
 | `src/components/chat/StreamingMessage.tsx` | 流式文本 + 闪烁光标 | 新建 |
 | `src/components/chat/ChatInput.tsx` | 输入框 + 发送按钮 | 新建 |
+| `src/components/chat/ProviderSelector.tsx` | Provider 下拉选择器 | 新建 |
+| `src/components/chat/ModelSelector.tsx` | 模型下拉选择器 | 新建 |
 | `src/App.tsx` | 顶层布局，组合 ChatContainer | 更新 |
 
 ### 5.6 前端实现要点

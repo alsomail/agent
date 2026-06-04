@@ -34,11 +34,13 @@ chatRoute.post("/:id/chat", zValidator("json", SendMessageRequestSchema), async 
     content: [{ type: "text", text: body.content }],
   };
 
-  const provider = createLLMProvider({
-    provider: "anthropic",
+  const llmProvider = createLLMProvider({
+    provider: (session.provider as "anthropic" | "ollama") ?? config.provider,
     apiKey: config.anthropicApiKey,
-    baseUrl: config.baseUrl,
+    baseUrl: session.provider === "ollama" ? config.ollamaBaseUrl : config.anthropicBaseUrl,
   });
+
+  const model = session.model || config.defaultModel;
 
   // 用于取消上游 LLM 请求
   const abortController = new AbortController();
@@ -69,13 +71,13 @@ chatRoute.post("/:id/chat", zValidator("json", SendMessageRequestSchema), async 
           encoder.encode(formatSSEEvent({ type: "state_change", state: "streaming" })),
         );
 
-        console.log(`[LLM] 调用 Anthropic model=${session.model}`);
+        console.log(`[LLM] 调用 provider=${session.provider} model=${model}`);
         let streamStarted = false;
 
         const systemPrompt = systemPromptStore.get(id);
 
-        for await (const event of provider.stream({
-          model: session.model,
+        for await (const event of llmProvider.stream({
+          model,
           messages: [userMessage],
           maxTokens: 4096,
           system: systemPrompt,

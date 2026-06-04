@@ -530,6 +530,67 @@ class AnthropicProvider implements LLMProvider {
 
 ---
 
+## 6.1 Provider 适配模式
+
+### 模式：Strategy + Factory
+
+```
+LLMProvider (Strategy 接口)
+    │
+    ├── AnthropicProvider  (SSE 解析)
+    │   ├── client.ts      → POST /v1/messages → ReadableStream
+    │   ├── stream-parser.ts → SSE (\n\n 分割) → NormalizedStreamEvent
+    │   └── mapper.ts      → system 作为顶层字段
+    │
+    └── OllamaProvider    (NDJSON 解析)
+        ├── client.ts      → POST /api/chat → ReadableStream
+        ├── stream-parser.ts → NDJSON (\n 分割) → NormalizedStreamEvent
+        └── mapper.ts      → system 作为 messages[0]
+```
+
+### 归一化策略差异
+
+不同 Provider 的事件粒度不同：
+
+| 事件 | Anthropic | Ollama |
+|------|-----------|--------|
+| `text_delta` | 每个 content_block_delta 映射 | 每个有 message.content 的 chunk 映射 |
+| `content_block_start` | content_block_start 映射 | 不 emit（Ollama 无此概念） |
+| `content_block_stop` | content_block_stop 映射 | 不 emit |
+| `message_start` | message_start 映射 | 不 emit |
+| `message_stop` | message_stop 映射 | done:true 后 emit |
+| `message_delta` | message_delta 映射（含 stop_reason） | done:true 后 emit（含 done_reason + usage） |
+| `tool_call_delta` | 每个 input_json_delta 映射 | 一次性 emit（完整 JSON） |
+| `error` | error 事件映射 | HTTP 错误映射 |
+
+**关键原则**：上层的 Agent Loop 和 relay 不要假设所有事件都存在——它们处理 NormalizedStreamEvent 的判别联合，对未知事件类型静默忽略。
+
+## 6.2 Provider 发现与模型列表
+
+Provider 发现和模型列表是管理能力，不属于 `LLMProvider` 接口（那是推理能力）。它们通过独立的 REST 端点暴露：
+
+```
+GET /api/providers  → ProviderInfo[]   (哪些 Provider 可用)
+GET /api/models?provider=ollama → ModelInfo[]  (该 Provider 的模型列表)
+```
+
+### Provider 可用性检测
+
+- **Ollama**：尝试 GET /api/tags，成功则标记 available=true
+- **Anthropic**：检查 ANTHROPIC_API_KEY 环境变量是否存在
+
+### 会话中的 Provider 绑定
+
+创建会话时记录 provider + model：
+```
+POST /api/session { provider: "ollama", model: "llama3.2" }
+→ session.provider = "ollama", session.model = "llama3.2"
+```
+
+chat 路由根据 session.provider 调用 factory 创建对应的 LLMProvider。
+
+---
+
 ## 7. 渐进实现路径
 
 LLM 集成层不是一次写完的，而是随着项目阶段逐步构建：

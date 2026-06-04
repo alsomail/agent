@@ -11,6 +11,8 @@
 | `agent-state.ts` | Agent 状态枚举 (`idle`, `streaming`, `tool_executing`, `completed`, `error`, `aborted`) |
 | `api.ts` | API 统一响应信封 (`{ success, data?, error? }`)，错误码枚举 |
 | `health.ts` | 健康检查响应格式 |
+| `model.ts` | 模型信息相关 Schema：模型条目、模型列表查询参数、模型列表响应 |
+| `provider.ts` | Provider 信息相关 Schema：Provider 条目（id/name/available）、Provider 列表响应 |
 | `session.ts` | 会话相关 Schema：创建会话请求（含 model/provider）、会话信息结构 |
 | `message.ts` | 消息相关 Schema：内容块（文本/工具调用/工具结果）、消息结构、发送消息请求 |
 | `stream-event.ts` | SSE 流事件 Schema：客户端接收的所有事件类型定义 |
@@ -36,6 +38,8 @@
 | `POST` | `/api/session` | 请求: `CreateSessionRequest { systemPrompt?, model?, provider? }` / 响应: `Session` |
 | `GET` | `/api/session/:id` | 响应: `Session` |
 | `DELETE` | `/api/session/:id` | 响应: `null` |
+| `GET` | `/api/providers` | 响应: `{ providers: ProviderInfo[] }` |
+| `GET` | `/api/models?provider=ollama` | 响应: `{ models: ModelInfo[] }` |
 | `POST` | `/api/session/:id/chat` | 请求: `SendMessageRequest { content: string }` / 响应: SSE 流 (`StreamEvent`) |
 
 所有端点返回统一信封格式：

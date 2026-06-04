@@ -4,6 +4,7 @@ import { errorHandler } from "./middleware/error-handler.js";
 import { loggerMiddleware } from "./middleware/logger.js";
 import { chatRoute } from "./routes/chat.js";
 import { healthRoute } from "./routes/health.js";
+import { providerRoute } from "./routes/provider.js";
 import { sessionRoute } from "./routes/session.js";
 
 export function createApp(): Hono {
@@ -17,6 +18,7 @@ export function createApp(): Hono {
   app.route("/api/health", healthRoute);
   app.route("/api/session", sessionRoute);
   app.route("/api/session", chatRoute);
+  app.route("/api", providerRoute); // /api/providers, /api/models
 
   // 全局错误处理
   app.onError(errorHandler);

@@ -1,5 +1,6 @@
-import { useCallback, useRef, useState } from "react";
-import { createSession, streamChat } from "../api/client.js";
+import type { ModelInfo, ProviderInfo } from "@myagent/protocol";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createSession, fetchProviders, streamChat } from "../api/client.js";
 
 export interface ChatMessage {
   id: string;
@@ -14,14 +15,41 @@ export function useChat() {
   const [error, setError] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
 
+  // Provider/Model 选择状态
+  const [providers, setProviders] = useState<ProviderInfo[]>([]);
+  const [selectedProvider, setSelectedProvider] = useState<string>("ollama");
+  const [selectedModel, setSelectedModel] = useState<string>("");
+
   const controllerRef = useRef<AbortController | null>(null);
 
+  // 拉取 Provider 列表并自动选择第一个可用的
+  const fetchProvidersAndModels = useCallback(async () => {
+    try {
+      const list = await fetchProviders();
+      setProviders(list);
+      const firstAvailable = list.find((p) => p.available);
+      if (firstAvailable) {
+        setSelectedProvider(firstAvailable.id);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "获取 Provider 列表失败");
+    }
+  }, []);
+
+  // Provider 切换时重置模型选择
+  const handleProviderChange = useCallback((providerId: string) => {
+    setSelectedProvider(providerId);
+    setSelectedModel("");
+  }, []);
+
   const ensureSession = useCallback(async (): Promise<string> => {
-    if (sessionId) return sessionId;
-    const id = await createSession();
+    const provider = selectedProvider || "ollama";
+    const model = selectedModel || "llama3.2";
+
+    const id = await createSession(provider, model);
     setSessionId(id);
     return id;
-  }, [sessionId]);
+  }, [selectedProvider, selectedModel]);
 
   const send = useCallback(
     async (content: string) => {
@@ -96,5 +124,12 @@ export function useChat() {
     error,
     send,
     dismissError: () => setError(null),
+    // Provider/Model 选择
+    providers,
+    selectedProvider,
+    selectedModel,
+    setSelectedModel,
+    fetchProvidersAndModels,
+    handleProviderChange,
   };
 }

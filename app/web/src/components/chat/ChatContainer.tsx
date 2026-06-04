@@ -1,9 +1,30 @@
+import { useEffect } from "react";
 import { useChat } from "../../hooks/useChat.js";
 import ChatInput from "./ChatInput.js";
 import MessageList from "./MessageList.js";
+import ModelSelector from "./ModelSelector.js";
+import ProviderSelector from "./ProviderSelector.js";
 
 export default function ChatContainer() {
-  const { messages, isStreaming, currentText, error, send, dismissError } = useChat();
+  const {
+    messages,
+    isStreaming,
+    currentText,
+    error,
+    send,
+    dismissError,
+    providers,
+    selectedProvider,
+    selectedModel,
+    setSelectedModel,
+    fetchProvidersAndModels,
+    handleProviderChange,
+  } = useChat();
+
+  // 挂载时拉取 Provider 列表
+  useEffect(() => {
+    fetchProvidersAndModels();
+  }, [fetchProvidersAndModels]);
 
   return (
     <div
@@ -25,6 +46,22 @@ export default function ChatContainer() {
         }}
       >
         <h1 style={{ fontSize: 20, fontWeight: 600 }}>🤖 MyAgent</h1>
+        <div
+          style={{ display: "flex", gap: 16, marginTop: 8, alignItems: "center", flexWrap: "wrap" }}
+        >
+          <ProviderSelector
+            providers={providers}
+            selected={selectedProvider}
+            onSelect={handleProviderChange}
+          />
+          {selectedProvider && (
+            <ModelSelector
+              provider={selectedProvider}
+              selected={selectedModel}
+              onSelect={setSelectedModel}
+            />
+          )}
+        </div>
         <p style={{ fontSize: 13, color: "var(--color-text-secondary)", marginTop: 4 }}>
           AI Agent Playground — Phase 1
         </p>

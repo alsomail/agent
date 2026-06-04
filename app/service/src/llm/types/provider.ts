@@ -14,7 +14,7 @@ export interface LLMStreamParams {
 }
 
 export interface LLMConfig {
-  provider: "anthropic";
-  apiKey: string;
+  provider: "anthropic" | "ollama";
+  apiKey?: string;
   baseUrl?: string;
 }
