@@ -196,43 +196,164 @@ HTTP 请求
 
 ## @myagent/web — React 前端
 
+### 目录结构
+
 ```
 app/web/
-├── package.json              # 依赖 @myagent/protocol (workspace:*)、react、hono
-├── tsconfig.json             # 继承 tsconfig.base.json
-├── vite.config.ts            # Vite 配置（端口、API proxy）
+├── package.json              # @myagent/web，依赖 @myagent/protocol (workspace:*)、react、vite
+├── tsconfig.json             # 继承 tsconfig.base.json，lib 增加 DOM
+├── vite.config.ts            # Vite 配置（端口 5173，/api → :3001 proxy）
+├── index.html                # SPA 入口
 └── src/
     ├── main.tsx              # 应用入口（createRoot + StrictMode）
-    ├── App.tsx               # 聊天 UI 主组件
+    ├── App.tsx               # 顶层布局，组合 ChatContainer
     │
     ├── api/
-    │   └── client.ts         # SSE 流式客户端（基于 fetch + ReadableStream）
+    │   └── client.ts         # SSE 流式客户端（fetch + ReadableStream）+ Provider/Model API
     │
     ├── hooks/
-    │   ├── useChat.ts        # 聊天状态管理（消息发送、SSE 接收、历史管理）
-    │   ├── useSession.ts     # 会话管理（CRUD、切换、持久化）
-    │   └── useAgentState.ts  # Agent 状态管理（工具调用、循环步骤、进度）
+    │   └── useChat.ts        # 聊天状态管理 hook（唯一状态中心）
     │
-    ├── components/           # UI 组件（按功能分组）
-    │   ├── chat/             # 聊天相关组件
-    │   ├── session/          # 会话列表/切换组件
-    │   └── layout/           # 布局组件
+    ├── components/
+    │   └── chat/
+    │       ├── ChatContainer.tsx    # 聊天区域容器（Header + MessageList + Input）
+    │       ├── ProviderSelector.tsx # Provider 下拉选择器
+    │       ├── ModelSelector.tsx    # 模型下拉选择器（动态拉取列表）
+    │       ├── MessageList.tsx      # 消息列表 + 自动滚动
+    │       ├── MessageBubble.tsx    # 单条消息渲染（用户/AI 不同样式）
+    │       ├── StreamingMessage.tsx # 流式文本 + 闪烁光标动画
+    │       └── ChatInput.tsx        # 输入框 + 发送按钮（Enter 发送）
     │
     └── styles/
-        └── index.css         # 全局样式 + CSS 变量
+        └── index.css         # 全局样式 + 深色主题 CSS 变量 + 光标动画
 ```
 
-### 当前状态
+### Phase 1 组件树
 
-前端目前处于脚手架阶段：
+组件层级与 Props 流向（箭头 = 数据传递方向）：
 
-- `App.tsx` 有基础的聊天 UI（输入框 + 消息列表 + 发送按钮）
-- `api/client.ts`、`hooks/useChat.ts` 等是占位文件，等待 Phase 1 实现
-- 使用 CSS 变量做主题化（`--color-surface`、`--color-border` 等）
+```
+App.tsx
+│  顶层布局（全屏 flex column）
+│
+└── ChatContainer.tsx
+    │  useEffect 挂载时获取 Provider 列表
+    │  调用 useChat() 获取全部状态和方法
+    │
+    ├── Header 区
+    │   ├── ProviderSelector.tsx
+    │   │   props: { providers, selected, onSelect }
+    │   │   下拉选择器，不可用的 Provider 灰色禁用
+    │   │
+    │   └── ModelSelector.tsx
+    │       props: { provider, selected, onSelect }
+    │       选 Ollama 时 GET /api/models 动态拉取
+    │       选 Anthropic 时使用预设列表
+    │       加载中/错误状态各有提示
+    │
+    ├── MessageList.tsx
+    │   props: { messages[], currentText, isStreaming }
+    │   可滚动区域（flex: 1, overflow-y: auto）
+    │   自动滚动：useRef + scrollIntoView
+    │   空状态："输入消息开始对话"
+    │   │
+    │   ├── MessageBubble.tsx
+    │   │   props: { message: { id, role, content } }
+    │   │   用户消息：右对齐，var(--color-surface) 深色背景
+    │   │   AI 消息：左对齐，var(--color-border) 边框
+    │   │
+    │   └── StreamingMessage.tsx
+    │       props: { text: string, isActive: boolean }
+    │       isActive 时尾部显示 █（@keyframes blink 0.8s）
+    │
+    ├── 状态指示区
+    │   isStreaming → "⏳ Agent 正在思考..."
+    │   error → 红色错误横幅 + 关闭按钮
+    │
+    └── ChatInput.tsx
+        props: { onSend: (content) => void, disabled: boolean }
+        Enter 发送，Shift+Enter 换行
+        streaming/未选模型时 disabled
+        发送后自动清空
+```
+
+### 状态管理
+
+`useChat` hook 是前端唯一的业务状态中心，不引入全局状态库（如 Redux/Zustand），Phase 1 用 React 内置的 useState/useRef/useCallback 足够。
+
+接口签名：
+
+```typescript
+function useChat() {
+  return {
+    // 状态
+    messages: ChatMessage[],        // 完成的消息列表 { id, role: "user"|"assistant", content }
+    currentText: string,            // 流式中累积的文本（未完成，real-time 显示）
+    isStreaming: boolean,           // 是否正在接收 SSE 流
+    error: string | null,           // 最近错误信息
+    providers: ProviderInfo[],      // 可用 Provider 列表
+    selectedProvider: string,       // 当前选择的 Provider ID
+    selectedModel: string,          // 当前选择的模型名
+    models: ModelInfo[],            // 当前 Provider 的模型列表
+
+    // 方法
+    send(content: string): void,       // 发送消息（含竞态保护）
+    dismissError(): void,              // 关闭错误提示
+    handleProviderChange(id): void,    // 切换 Provider
+    fetchProvidersAndModels(): void,   // 初始化拉取
+  }
+}
+```
+
+组件数据流：
+
+```
+useChat ──► ChatContainer
+              ├── providers + selectedProvider ──► ProviderSelector
+              ├── selectedProvider + selectedModel ──► ModelSelector
+              ├── messages + currentText + isStreaming ──► MessageList
+              │                                              ├── MessageBubble × N
+              │                                              └── StreamingMessage
+              ├── isStreaming + error ──► 状态指示区
+              └── send + isStreaming ──► ChatInput
+```
+
+关键实现细节：
+- `send()` 中用局部变量 `accumulated` 累积文本，不直接读 React state（避免闭包旧值）
+- `AbortController` 防竞态：发送新消息时 abort 旧请求
+- `createSession()` 携带 `selectedProvider` + `selectedModel`
+- 选 Ollama 后自动 `GET /api/models?provider=ollama`
+
+### 视觉布局
+
+```
+┌──────────────────────────────────────────────────────┐
+│ 🤖 MyAgent  提供: [Ollama ▼] 模型: [llama3.2 ▼]     │ ← header (固定)
+├──────────────────────────────────────────────────────┤
+│                                                      │
+│  ┌──────────────────────────────────────────┐       │
+│  │ 👤 你好                                  │       │ ← 用户消息（右对齐/深色背景）
+│  └──────────────────────────────────────────┘       │
+│                                                      │
+│  ┌──────────────────────────────────────────┐       │
+│  │ 🤖 你好！我是 AI Agent，有什么可以帮      │       │ ← AI 消息（左对齐/边框）
+│  │    你的吗？█                             │       │ ← streaming 时尾部闪烁光标
+│  └──────────────────────────────────────────┘       │
+│                                                      │ ← 可滚动区域
+│  ⏳ Agent 正在思考...                                │ ← 状态提示
+│                                                      │
+├──────────────────────────────────────────────────────┤
+│  ┌──────────────────────────────────┐ [发送]        │ ← footer (固定)
+│  │ 输入消息...                       │              │
+│  └──────────────────────────────────┘              │
+└──────────────────────────────────────────────────────┘
+```
+
+深色主题 CSS 变量定义在 `src/styles/index.css`：`--color-bg`、`--color-surface`、`--color-border`、`--color-text`、`--color-accent`、`--color-error`、`--radius-sm/md`。
 
 ### Vite Proxy 机制
 
-开发环境下，前端 `fetch("/api/...")` 的请求会被 Vite 的 proxy 转发到 `http://localhost:3001`。这样前端代码不需要硬编码后端地址，生产环境通过反向代理（Nginx 等）实现同样的路由。
+开发环境下，前端 `fetch("/api/...")` 的请求被 Vite proxy 转发到 `http://localhost:3001`。前端代码不硬编码后端地址，生产环境通过反向代理实现同样路由。
 
 ---
 

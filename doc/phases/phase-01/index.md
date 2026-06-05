@@ -215,184 +215,34 @@ Provider 发现和模型列表的 Schema 定义见 [协议索引](../../../app/p
 
 ---
 
-## 五、Web 前端设计
+## 五、Web 前端
 
-### 5.1 Phase 1 UI 功能需求
+> 组件树、状态管理、视觉布局等完整设计见 [项目结构 §web 前端](../../architecture/project-structure.md#myagentweb--react-前端)。
 
-| 功能 | 说明 | 优先级 |
-|------|------|--------|
-| 消息列表 | 显示用户消息和 Agent 回复，支持滚动 | 必须 |
-| 流式文本 | Agent 回复逐字出现，未完成时有光标/闪烁指示 | 必须 |
-| 输入框 | 底部固定，Enter 发送，流式中禁用 | 必须 |
-| 状态指示 | 流式中显示"Agent 正在思考..."，错误时显示错误信息 | 必须 |
-| 自动滚动 | 新消息或流式文本增长时自动滚动到底部 | 必须 |
-| 空状态 | 无消息时显示引导文案 | 建议 |
+### Phase 1 实现要点
 
-Phase 1 **不需要**：侧边栏、会话列表、会话切换、设置面板。
+| 要点 | 说明 |
+|------|------|
+| SSE 消费用 fetch | EventSource 只支持 GET，我们需要 POST |
+| `accumulated` 局部变量 | 不读 React state，避免闭包旧值 |
+| `AbortController` 防竞态 | 发送新消息时 abort 旧请求 |
+| `::after` 实现光标 | 闪烁光标用伪元素，不插入 DOM 文本节点 |
+| `scrollIntoView` | useEffect 监听 messages/currentText 变化 |
 
-### 5.2 组件结构
+### Phase 1 前端文件清单
 
-```
-App.tsx
-│  顶层布局（全屏容器、flex column）
-│  管理会话 ID（Phase 1 使用默认会话）
-│
-├── components/chat/
-│   │
-│   ├── ChatContainer.tsx
-│   │   整个聊天区域的容器组件
-│   │   使用 useChat hook 获取状态
-│   │   组合 MessageList + ChatInput
-│   │
-│   ├── MessageList.tsx
-│   │   可滚动的消息列表
-│   │   props: messages[], currentText, isStreaming
-│   │   自动滚动逻辑（useRef + scrollIntoView）
-│   │
-│   ├── MessageBubble.tsx
-│   │   单条消息的渲染
-│   │   props: role ("user" | "assistant"), content: string
-│   │   用户消息和 Agent 消息使用不同样式
-│   │
-│   ├── StreamingMessage.tsx
-│   │   流式文本渲染（仅 Agent 消息在流式中使用）
-│   │   props: text: string, isActive: boolean
-│   │   尾部闪烁光标动画（CSS animation）
-│   │
-│   └── ChatInput.tsx
-│       底部输入区域
-│       props: onSend(content), disabled: boolean
-│       Enter 发送，Shift+Enter 换行
-│       streaming 时禁用输入和按钮
-```
-
-### Provider/Model 选择器（新增）
-
-```
-App.tsx
-│
-├── components/chat/
-│   ├── ProviderSelector.tsx     ← 新增
-│   │   props: onSelect(providerId), selected |
-│   │   下拉选择 Ollama / Anthropic（仅当可用）
-│   │
-│   ├── ModelSelector.tsx        ← 新增
-│   │   props: provider, onSelect(modelName), selected
-│   │   动态拉取模型列表
-│   │
-│   ├── ChatContainer.tsx        ← 更新
-│   │   Header 集成 ProviderSelector + ModelSelector
-│   │
-│   └── ...（其他不变）
-```
-
-前端状态管理（useChat 更新）：
-
-```
-useChat:
-  新增状态:
-    providers: ProviderInfo[]     ← 可用 Provider 列表
-    selectedProvider: string      ← 当前选择的 Provider
-    models: ModelInfo[]           ← 当前 Provider 的模型列表
-    selectedModel: string         ← 当前选择的模型
-
-  新增行为:
-    fetchProviders()              ← 组件挂载时调用
-    selectProvider(id)            ← 切换 Provider → 重新拉取模型列表
-    send() 中：创建 session 携带 selectedProvider + selectedModel
-```
-
-实现要点：
-- 无 ANTHROPIC_API_KEY 时 UI 不显示 Anthropic 选项
-- 选 Ollama 后自动 GET /api/models?provider=ollama 拉取模型
-- Ollama 不可达时显示"Ollama 服务未运行，请先执行 ollama serve"
-- 选 Anthropic 时模型列表使用预设值（从 session schema 的枚举）
-
-### 5.3 状态管理
-
-`useChat` hook 是前端唯一的状态中心：
-
-```
-useChat(sessionId) → {
-  messages: ChatMessage[]     // 完成的消息列表
-  currentText: string         // 流式中累积的文本（未完成）
-  isStreaming: boolean         // 是否正在流式接收
-  error: string | null         // 最近的错误信息
-  send(content: string): void  // 发送消息
-}
-```
-
-组件数据流：
-
-```
-useChat ──► ChatContainer
-             ├── messages + currentText + isStreaming ──► MessageList
-             │                                            ├── MessageBubble × N
-             │                                            └── StreamingMessage（仅 isStreaming 时）
-             └── send + isStreaming ──► ChatInput
-```
-
-### 5.4 视觉布局
-
-```
-┌────────────────────────────────────────────┐
-│  🤖 MyAgent     Phase 1                   │ ← header (固定)
-├────────────────────────────────────────────┤
-│                                            │
-│  ┌──────────────────────────────────────┐  │
-│  │ 👤 你好                             │  │ ← 用户消息（右对齐/深色背景）
-│  └──────────────────────────────────────┘  │
-│                                            │
-│  ┌──────────────────────────────────────┐  │
-│  │ 🤖 你好！我是 AI Agent，有什么可以    │  │ ← Agent 消息（左对齐/边框）
-│  │    帮你的吗？█                       │  │ ← 流式时尾部有闪烁光标
-│  └──────────────────────────────────────┘  │
-│                                            │ ← 可滚动区域 (flex: 1, overflow-y: auto)
-│  ┌──────────────────────────────────────┐  │
-│  │ ⏳ Agent 正在思考...                 │  │ ← 状态提示（仅 streaming 时）
-│  └──────────────────────────────────────┘  │
-│                                            │
-├────────────────────────────────────────────┤
-│  ┌──────────────────────────────┐ [发送]   │ ← footer (固定)
-│  │ 输入消息...                   │          │
-│  └──────────────────────────────┘          │
-└────────────────────────────────────────────┘
-```
-
-深色主题 CSS 变量已在 `app/web/src/styles/index.css` 中定义。
-
-### 5.5 前端文件清单
-
-| 文件 | 职责 | 新建/更新 |
-|------|------|----------|
-| `src/api/client.ts` | SSE 流式客户端（fetch + ReadableStream → AsyncIterable\<StreamEvent\>） | 更新 |
-| `src/hooks/useChat.ts` | 聊天状态管理 hook | 更新 |
-| `src/components/chat/ChatContainer.tsx` | 聊天区域容器 | 新建 |
-| `src/components/chat/MessageList.tsx` | 消息列表 + 自动滚动 | 新建 |
-| `src/components/chat/MessageBubble.tsx` | 单条消息渲染 | 新建 |
-| `src/components/chat/StreamingMessage.tsx` | 流式文本 + 闪烁光标 | 新建 |
-| `src/components/chat/ChatInput.tsx` | 输入框 + 发送按钮 | 新建 |
-| `src/components/chat/ProviderSelector.tsx` | Provider 下拉选择器 | 新建 |
-| `src/components/chat/ModelSelector.tsx` | 模型下拉选择器 | 新建 |
-| `src/App.tsx` | 顶层布局，组合 ChatContainer | 更新 |
-
-### 5.6 前端实现要点
-
-**`api/client.ts`** — SSE 流消费：
-- 用 `fetch`（非 EventSource——需要 POST）
-- `buffer + \n\n` 分割模式（和服务端解析 Anthropic SSE 一样）
-- 返回 `AsyncIterable<StreamEvent>`（`StreamEvent` 从 `@myagent/protocol` import）
-- 透传 `AbortSignal` 给 fetch
-
-**`hooks/useChat.ts`** — 状态管理：
-- `accumulated` 局部变量累积文本（不读 React state，避免旧值）
-- `AbortController` 防竞态：发送新消息时中止旧请求
-- `AbortError` 静默处理
-
-**`StreamingMessage.tsx`** — 流式文本：
-- 接收 `text` prop，直接渲染
-- `isActive` 时显示尾部闪烁光标（`@keyframes blink`）
-- 光标用 `::after` 伪元素实现，不影响文本内容
+| # | 文件 | 职责 | 新建/更新 |
+|---|------|------|----------|
+| 17 | `web/src/api/client.ts` | SSE 流客户端 | 更新 |
+| 18 | `web/src/hooks/useChat.ts` | 聊天 hook | 更新 |
+| 19 | `web/src/components/chat/MessageBubble.tsx` | 消息气泡 | 新建 |
+| 20 | `web/src/components/chat/StreamingMessage.tsx` | 流式文本 + 光标 | 新建 |
+| 21 | `web/src/components/chat/MessageList.tsx` | 消息列表 + 自动滚动 | 新建 |
+| 22 | `web/src/components/chat/ChatInput.tsx` | 输入框 | 新建 |
+| 23 | `web/src/components/chat/ChatContainer.tsx` | 容器 | 新建 |
+| 24 | `web/src/components/chat/ProviderSelector.tsx` | Provider 选择器 | 新建 |
+| 25 | `web/src/components/chat/ModelSelector.tsx` | 模型选择器 | 新建 |
+| 26 | `web/src/App.tsx` | 顶层布局 | 更新 |
 
 ---
 
