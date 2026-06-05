@@ -153,9 +153,14 @@ app/service/
     │       ├── anthropic/    #   Anthropic: HTTP client + stream parser + mapper
     │       └── openai/       #   OpenAI: HTTP client + stream parser + mapper
     │
-    ├── agent/                # Agent 核心逻辑
-    │   └── (loop, context,   #   循环控制、上下文管理、状态机
-    │        state-machine)
+    ├── db/                   # 数据库层（Phase 2+）
+    │   ├── schema.ts         #   Drizzle Schema（sessions, messages, summaries）
+    │   ├── index.ts          #   SQLite 连接 + Drizzle 实例
+    │   └── migrate.ts        #   数据库迁移
+    │
+    ├── agent/                # Agent 核心逻辑（Phase 2+）
+    │   ├── context.ts        #   上下文构建器（Token 计数 + 截断 + 压缩调度）
+    │   └── summarizer.ts     #   Running Summary 压缩器
     │
     ├── tools/                # 工具系统
     │   └── (registry,        #   工具注册表、执行器、内置工具
@@ -165,7 +170,7 @@ app/service/
     │   └── (sse-relay)       #   将 LLM 归一化事件转发为客户端 SSE
     │
     └── store/                # 存储层
-        └── (memory-store)    #   内存存储（后续升级为 SQLite）
+        └── session-store.ts  #   会话 CRUD（基于 SQLite，Phase 2+）
 ```
 
 ### 分层架构说明
