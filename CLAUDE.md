@@ -139,6 +139,47 @@ service/llm/types/  → 服务端内部类型（NormalizedStreamEvent、LLMProvi
 - `NormalizedStreamEvent`（服务端内部）→ 经过 relay 翻译 → `StreamEvent`（protocol，客户端可见）
 - `NormalizedMessage`（服务端内部）→ 经过 mapper 转换 → Anthropic/OpenAI API 格式
 
+## 新对话入门：读取顺序
+
+接手此项目的 Agent，按以下顺序快速了解上下文：
+
+```
+1. doc/README.md             → 项目是什么
+2. doc/phases/index.md       → 当前进度（哪个 Phase 已完成/进行中）
+3. doc/architecture/index.md → 架构设计入口
+4. doc/architecture/project-structure.md → 目录结构 + 组件树
+5. doc/architecture/llm-integration.md   → LLM 层设计（核心）
+6. doc/architecture/data-flow.md         → 端到端数据流
+7. app/protocol/index.md     → 前后端协议定义
+8. doc/phases/{current}/     → 当前阶段的实现规格书
+```
+
+## 文档红线（不可违反）
+
+### 唯一性原则
+
+**同一个设计细节只能存在于一个地方，其余文档通过相对链接 + 章节锚点索引。**
+
+```
+architecture/  ← 架构设计的唯一来源（为什么这样设计、组件树、状态管理、数据流）
+phases/        ← 实现规格书（做什么、怎么做、按什么顺序、怎么验证）
+references/    ← 外部 API 规范（Anthropic、Ollama 的请求/响应格式）
+protocol/      ← 代码中的数据契约（Zod Schema）
+```
+
+- Phase 文档中**不复制**架构设计细节 → 写 `> 详情见 [xxx](../../architecture/xxx.md#章节锚点)`
+- Phase 文档中**不复制**外部 API 格式 → 写 `> 请求格式见 [xxx](../../references/xxx.md#锚点)`
+- Phase 文档中**不复制**完整类型定义 → 写 `import { ... } from "@myagent/protocol"` 或指向源文件
+- Architecture 文档中**不写**实现清单或验证步骤 → 那是 Phase 文档的职责
+
+违反此原则的 PR 必须修正后才能合并。
+
+### 其他红线
+
+- **不可变模式**：永远创建新对象，不修改现有对象
+- **协议优先**：新 API 端点必须先定义 Zod Schema
+- **文件 ≤ 800 行**：超过必须拆分
+
 ## 技术栈
 
 - 前端：React 19 + Vite 6

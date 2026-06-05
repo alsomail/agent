@@ -4,7 +4,7 @@
 
 | 阶段 | 名称 | 状态 | 核心交付物 |
 |------|------|------|----------|
-| Phase 1 | 最小 Agent 循环 | 🔜 待开始 | 单轮 LLM SSE 流式响应 |
+| Phase 1 | 最小 Agent 循环 | ✅ 已完成 | 单轮 LLM SSE 流式响应 + Ollama 集成 |
 | Phase 2 | 对话记忆与上下文管理 | ⬜ 规划中 | 会话 CRUD、历史消息管理 |
 | Phase 3 | 工具/能力插件系统 | ⬜ 规划中 | Tool Registry、Agent 循环扩展 |
 | Phase 4 | 短期工作记忆 | ⬜ 规划中 | Scratchpad、事实提取 |
@@ -25,11 +25,17 @@
 ## 当前进度
 
 - ✅ Step 0：项目脚手架搭建
+- ✅ Phase 1：最小 Agent 循环（已完成）
+  - ✅ 手写 Anthropic SSE 流解析器
+  - ✅ 手写 Ollama NDJSON 流解析器
+  - ✅ LLMProvider 接口 + Strategy/Factory 模式
+  - ✅ SSE 中继层（内部事件 → 客户端 StreamEvent）
+  - ✅ Provider/Model 选择 UI
+  - ✅ 端到端流式响应（fetch + ReadableStream）
 
 ## 下一步
 
-- Phase 1：实现最小 Agent 循环
-  - 手写 Anthropic HTTP 客户端
-  - 手写 SSE 流解析器
-  - 实现 Agent 循环（单轮 LLM 调用）
-  - 前端 SSE 流式消费
+- Phase 2：对话记忆与上下文管理
+  - 会话历史持久化（File/SQLite）
+  - Token 计数与截断策略
+  - 会话列表/切换 UI（侧边栏）
