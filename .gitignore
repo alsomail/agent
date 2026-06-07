@@ -6,4 +6,5 @@ dist
 coverage
 .claude/*
 !.claude/settings.json
+*.tsbuildinfo
 .data/
