@@ -1,4 +1,11 @@
-import type { ModelInfo, ProviderInfo, StreamEvent } from "@myagent/protocol";
+import type {
+  ModelInfo,
+  ProviderInfo,
+  Session,
+  SessionListItem,
+  StoredMessage,
+  StreamEvent,
+} from "@myagent/protocol";
 
 export async function* streamChat(
   sessionId: string,
@@ -66,7 +73,7 @@ export async function fetchModels(provider: string): Promise<ModelInfo[]> {
   return (body as { models: ModelInfo[] }).models;
 }
 
-export async function createSession(provider = "ollama", model = "llama3.2"): Promise<string> {
+export async function createSession(provider: string, model: string): Promise<Session> {
   const response = await fetch("/api/session", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -78,5 +85,24 @@ export async function createSession(provider = "ollama", model = "llama3.2"): Pr
   }
 
   const body = await response.json();
-  return (body as { data: { id: string } }).data.id;
+  return (body as { data: Session }).data;
+}
+
+export async function fetchSessions(): Promise<SessionListItem[]> {
+  const response = await fetch("/api/session");
+  if (!response.ok) throw new Error(`Failed to fetch sessions: ${response.status}`);
+  const body = await response.json();
+  return (body as { data: SessionListItem[] }).data;
+}
+
+export async function fetchMessages(sessionId: string): Promise<StoredMessage[]> {
+  const response = await fetch(`/api/session/${sessionId}/messages`);
+  if (!response.ok) throw new Error(`Failed to fetch messages: ${response.status}`);
+  const body = await response.json();
+  return (body as { data: StoredMessage[] }).data;
+}
+
+export async function deleteSession(sessionId: string): Promise<void> {
+  const response = await fetch(`/api/session/${sessionId}`, { method: "DELETE" });
+  if (!response.ok) throw new Error(`Failed to delete session: ${response.status}`);
 }

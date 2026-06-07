@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { AgentStateEnum } from "./agent-state.js";
+import { StoredMessageSchema } from "./message.js";
 
 // 支持的 LLM Provider
 export const LLMProviderEnum = z.enum(["anthropic", "ollama", "openai"]);
@@ -28,3 +29,23 @@ export const SessionSchema = z.object({
 export type LLMProvider = z.infer<typeof LLMProviderEnum>;
 export type CreateSessionRequest = z.infer<typeof CreateSessionRequestSchema>;
 export type Session = z.infer<typeof SessionSchema>;
+
+// ─── 会话列表条目（侧边栏用，不含消息体）───
+
+export const SessionListItemSchema = z.object({
+  id: z.string().uuid(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+  model: z.string(),
+  provider: z.string(),
+  messageCount: z.number(),
+  title: z.string().optional(),
+});
+
+// ─── 会话详情（含消息历史）───
+export const SessionDetailSchema = SessionSchema.extend({
+  messages: z.array(StoredMessageSchema),
+});
+
+export type SessionListItem = z.infer<typeof SessionListItemSchema>;
+export type SessionDetail = z.infer<typeof SessionDetailSchema>;

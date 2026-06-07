@@ -48,3 +48,16 @@ export type ToolResultContentBlock = z.infer<typeof ToolResultContentBlockSchema
 export type ContentBlock = z.infer<typeof ContentBlockSchema>;
 export type Message = z.infer<typeof MessageSchema>;
 export type SendMessageRequest = z.infer<typeof SendMessageRequestSchema>;
+
+// ─── 持久化消息（数据库存储）───
+
+export const StoredMessageSchema = z.object({
+  id: z.string().uuid(),
+  sessionId: z.string().uuid(),
+  role: z.enum(["user", "assistant"]),
+  content: z.string(), // JSON 序列化的 ContentBlock[]
+  tokenCount: z.number().int().nonnegative().optional(),
+  createdAt: z.string().datetime(),
+});
+
+export type StoredMessage = z.infer<typeof StoredMessageSchema>;
