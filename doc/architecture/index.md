@@ -11,6 +11,7 @@
 | [data-flow.md](./data-flow.md) | 端到端数据流设计 |
 | [llm-integration.md](./llm-integration.md) | 手写 LLM 集成层架构 |
 | [memory-system.md](./memory-system.md) | Agent 记忆体系（6 层架构、上下文管理、压缩、持久化） |
+| [tool-system.md](./tool-system.md) | 工具/能力插件系统架构（协议分层、Tool Registry、Agent Loop 工具循环） |
 
 ## 设计原则
 

@@ -162,9 +162,10 @@ app/service/
     │   ├── context.ts        #   上下文构建器（Token 计数 + 截断 + 压缩调度）
     │   └── summarizer.ts     #   Running Summary 压缩器
     │
-    ├── tools/                # 工具系统
-    │   └── (registry,        #   工具注册表、执行器、内置工具
-    │        executor, builtins)
+    ├── tools/                # 工具系统（详见 architecture/tool-system.md）
+    │   ├── types.ts          #   服务端运行时工具接口（含 execute 函数）
+    │   ├── registry.ts       #   工具注册表、查找、导出 ToolDefinition
+    │   └── built-in/         #   内置工具（calculator, current_time）
     │
     ├── relay/                # SSE 中继层
     │   └── (sse-relay)       #   将 LLM 归一化事件转发为客户端 SSE

@@ -10,10 +10,12 @@
     "format": "biome format --write .",
     "typecheck": "pnpm -r run typecheck",
     "test": "vitest",
-    "codegen": "./app/codegen.sh build"
+    "codegen": "./app/codegen.sh build",
+    "test:e2e": "playwright test"
   },
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
+    "@playwright/test": "^1.60.0",
     "@types/better-sqlite3": "^7.6.13",
     "concurrently": "9.1.2",
     "lefthook": "1.11.13",

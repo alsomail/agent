@@ -16,7 +16,22 @@
 | `session.ts` | 会话相关 Schema：创建会话请求（含 model/provider）、会话信息结构 |
 | `message.ts` | 消息相关 Schema：内容块（文本/工具调用/工具结果）、消息结构、发送消息请求 |
 | `stream-event.ts` | SSE 流事件 Schema：客户端接收的所有事件类型定义 |
-| `tool.ts` | 工具相关 Schema：工具定义、工具调用、工具结果 |
+| `tool.ts` | 工具相关 Schema：工具定义、JSON Schema 参数、工具调用、工具结果 |
+
+## 工具协议
+
+工具协议的代码唯一来源是 `src/tool.ts`。Phase 文档和 architecture 文档只能链接到这里，不能复制完整类型定义。
+
+| Schema | 作用 | 关键字段 |
+|--------|------|----------|
+| `ToolJsonSchemaSchema` | Provider 可接收的 JSON Schema 子集 | `type`、`description`、`enum`、`properties`、`required`、`items` |
+| `ToolInputSchemaSchema` | 工具输入参数根 Schema | 固定 `type: "object"`，默认 `properties: {}`、`required: []`、`additionalProperties: false` |
+| `ToolNameSchema` | 工具名约束 | `^[a-z][a-z0-9_]*$`，最多 64 字符 |
+| `ToolDefinitionSchema` | 暴露给 LLM Provider 的工具定义 | `name`、`description`、`inputSchema` |
+| `ToolCallSchema` | 一次完整工具调用 | `id`、`name`、`input` |
+| `ToolResultSchema` | 工具执行结果 | `toolUseId`、`content`、`isError` |
+
+运行时工具执行器（`execute` 函数、AbortSignal、日志上下文）不属于 protocol，必须放在 `app/service/src/tools/`。
 
 ## SSE 事件类型
 
