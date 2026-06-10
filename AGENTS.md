@@ -5,6 +5,20 @@
 MyAgent 是一个以学习为核心目的的 AI Agent 项目。手写所有 LLM 集成层，
 不使用 Vercel AI SDK、LangChain 等黑盒封装。
 
+## Codex 子智能体派发约定
+
+- 项目级子智能体定义放在 `.codex/agents/*.toml`。
+- 每个可派发的子智能体 TOML 文件必须显式保留默认 `model` 与
+  `model_reasoning_effort`。虽然 Codex 官方文档说明省略 `model` 时应继承主窗口
+  model，但当前 Codex Desktop 的派发链路会先做 service tier validation；如果
+  agent 文件里没有可解析的默认 `model`，可能在派发前失败：
+  `spawn_agent could not resolve the child model for service tier validation`。
+- 主窗口派发子智能体时，可以在 `spawn_agent` 调用中显式传入 `model` 覆盖 agent
+  文件里的默认模型。例如 `phase-tester` 文件内默认 `model = "gpt-5.4"`，派发时传
+  `model: "gpt-5.5"` 可以让该次任务使用 `gpt-5.5` 执行。
+- 推荐实践：agent 文件里写稳定默认模型，具体任务需要更强或更便宜模型时，再由主窗口
+  在派发参数中显式覆盖；不要为了依赖继承而删除 agent 文件中的 `model`。
+
 ## 代码规范（强制执行）
 
 ### 1. 编辑后必须检查
