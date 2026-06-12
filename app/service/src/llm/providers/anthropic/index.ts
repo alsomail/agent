@@ -7,6 +7,7 @@ import type {
 import { callAnthropicStream } from "./client.js";
 import { toAnthropicMessages } from "./mapper.js";
 import { parseAnthropicStream } from "./stream-parser.js";
+import type { AnthropicToolDefinition } from "./types.js";
 
 export function createAnthropicProvider(config: {
   apiKey: string;
@@ -24,6 +25,7 @@ export function createAnthropicProvider(config: {
         messages,
         stream: true as const,
         ...(params.system ? { system: params.system } : {}),
+        ...(params.tools ? { tools: toAnthropicTools(params.tools) } : {}),
       };
 
       const byteStream = await callAnthropicStream(body, config.apiKey, params.signal, baseUrl);
@@ -79,4 +81,12 @@ export function createAnthropicProvider(config: {
       };
     },
   };
+}
+
+function toAnthropicTools(tools: NonNullable<LLMStreamParams["tools"]>): AnthropicToolDefinition[] {
+  return tools.map((tool) => ({
+    name: tool.name,
+    description: tool.description,
+    input_schema: tool.inputSchema,
+  }));
 }

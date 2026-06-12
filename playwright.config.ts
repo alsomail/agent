@@ -12,9 +12,9 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: "cd app/service && npx tsx --env-file=../../.env src/index.ts",
-      port: 3001,
-      timeout: 10_000,
+      command: "./app/dev.sh",
+      url: "http://localhost:5173",
+      timeout: 30_000,
       reuseExistingServer: true,
     },
   ],

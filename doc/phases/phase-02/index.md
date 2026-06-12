@@ -116,6 +116,7 @@ Drizzle Kit push 或自定义迁移脚本。Phase 2 首次建表，后续 Phase 
 |------|------|
 | 切换会话先加载历史 | `GET /api/session/:id/messages` → setMessages |
 | 新建会话清空 UI | 创建后 setMessages([])，sessionId 切换 |
+| 修改当前会话模型立即生效 | `PATCH /api/session/:id` 更新当前会话的 provider/model，后续消息直接使用新配置 |
 | 会话标题自动生成 | 取首条 user 消息前 30 字作为标题 |
 | 侧边栏宽度固定 240px | flex 布局，主区域 flex: 1 |
 
@@ -172,6 +173,8 @@ Drizzle Kit push 或自定义迁移脚本。Phase 2 首次建表，后续 Phase 
 3. 旧会话数据残留 → 数据库中保留旧 provider/model 的会话后重启服务并刷新页面 → 切换到旧会话时必须使用该会话保存的 provider/model；模型不存在时要返回可见错误，不得静默替换或调用错误模型。
 4. 快速连续新建会话 → 在模型列表加载完成前后连续点击新建会话 → 最多创建一个当前选中模型的有效会话，UI 当前会话、侧边栏和数据库一致。
 5. 切换会话时流式响应未结束 → 会话 A 正在响应时切换到会话 B → A 的后续流事件不得追加到 B 的消息列表。
+6. 在已有会话中切换模型 → 当前会话先用模型 A 发一轮，再切到模型 B 继续提问 → 后端必须读取更新后的 session.provider/model，不能继续沿用旧配置。
+7. 当前用户消息重复进入上下文 → chat route 已经先持久化 user 消息时，`buildContext` 只能从数据库读取历史，不得再额外追加同一条 newMessage，否则模型会把当前输入当成重复历史。
 
 ---
 

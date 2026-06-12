@@ -4,7 +4,14 @@ export interface AnthropicMessageRequest {
   max_tokens: number;
   messages: AnthropicMessageParam[];
   system?: string;
-  stream: true;
+  tools?: AnthropicToolDefinition[];
+  stream: boolean;
+}
+
+export interface AnthropicToolDefinition {
+  name: string;
+  description: string;
+  input_schema: Record<string, unknown>;
 }
 
 // ── 消息 ──

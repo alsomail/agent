@@ -1,20 +1,16 @@
 import type { ModelInfo } from "@myagent/protocol";
 import { useEffect, useRef, useState } from "react";
 import { fetchModels } from "../../api/client.js";
+import { ANTHROPIC_MODELS } from "../../lib/provider-models.js";
 
 interface Props {
   provider: string;
   selected: string;
   onSelect: (modelName: string) => void;
+  disabled?: boolean;
 }
 
-// Anthropic 预设模型（当 Ollama 不可用时使用）
-const ANTHROPIC_MODELS: ModelInfo[] = [
-  { name: "claude-sonnet-4-20250514", displayName: "Claude Sonnet 4", provider: "anthropic" },
-  { name: "claude-haiku-4-5-20251001", displayName: "Claude Haiku 4.5", provider: "anthropic" },
-];
-
-export default function ModelSelector({ provider, selected, onSelect }: Props) {
+export default function ModelSelector({ provider, selected, onSelect, disabled = false }: Props) {
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,6 +64,7 @@ export default function ModelSelector({ provider, selected, onSelect }: Props) {
         <select
           id="model-select"
           value={selected}
+          disabled={disabled}
           onChange={(e) => onSelect(e.target.value)}
           style={{
             padding: "4px 8px",
@@ -77,7 +74,8 @@ export default function ModelSelector({ provider, selected, onSelect }: Props) {
             color: "var(--color-text)",
             fontSize: 13,
             outline: "none",
-            cursor: "pointer",
+            cursor: disabled ? "not-allowed" : "pointer",
+            opacity: disabled ? 0.7 : 1,
             maxWidth: 180,
           }}
         >

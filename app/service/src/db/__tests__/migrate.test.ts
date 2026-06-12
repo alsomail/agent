@@ -5,7 +5,7 @@ import { runMigrations } from "../migrate.js";
 import * as schema from "../schema.js";
 
 describe("runMigrations", () => {
-  it("创建 sessions/messages/summaries 三张表", () => {
+  it("创建 sessions/messages/summaries/model_capability_cache 四张表", () => {
     const sqlite = new Database(":memory:");
     const db = drizzle(sqlite, { schema });
 
@@ -21,6 +21,7 @@ describe("runMigrations", () => {
     expect(tableNames).toContain("sessions");
     expect(tableNames).toContain("messages");
     expect(tableNames).toContain("summaries");
+    expect(tableNames).toContain("model_capability_cache");
   });
 
   it("重复执行不会报错", () => {
@@ -35,6 +36,6 @@ describe("runMigrations", () => {
         "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
       )
       .all() as Array<{ name: string }>;
-    expect(result.length).toBe(3);
+    expect(result.length).toBe(4);
   });
 });

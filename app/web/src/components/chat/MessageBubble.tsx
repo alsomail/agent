@@ -1,4 +1,5 @@
 import type { ChatMessage } from "../../hooks/useChat.js";
+import ToolCallBlock from "./ToolCallBlock.js";
 
 interface Props {
   message: ChatMessage;
@@ -38,7 +39,34 @@ export default function MessageBubble({ message }: Props) {
         >
           {isUser ? "👤 你" : "🤖 Agent"}
         </div>
-        <div>{message.content}</div>
+        <div style={{ display: "grid", gap: 10 }}>
+          {message.content.map((block, index) => {
+            if (block.type === "text") {
+              return <div key={`${message.id}-${index}`}>{block.text}</div>;
+            }
+
+            if (block.type === "tool_use") {
+              return (
+                <ToolCallBlock
+                  key={`${message.id}-${block.id}`}
+                  toolName={block.name}
+                  partialJson={JSON.stringify(block.input, null, 2)}
+                  status="completed"
+                />
+              );
+            }
+
+            return (
+              <ToolCallBlock
+                key={`${message.id}-${block.toolUseId}`}
+                toolName={block.toolUseId}
+                result={block.content}
+                status={block.isError ? "error" : "completed"}
+                isError={block.isError}
+              />
+            );
+          })}
+        </div>
       </div>
     </div>
   );

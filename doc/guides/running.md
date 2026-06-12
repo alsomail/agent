@@ -44,3 +44,27 @@ pnpm run typecheck
 # 测试
 pnpm run test
 ```
+
+## 日志查看
+
+服务端日志会同时输出到：
+
+- 当前运行终端（开发时最直观）
+- `.data/logs/service.log`（持久化日志文件）
+
+常用查看方式：
+
+```bash
+# 持续追踪最新日志
+tail -f .data/logs/service.log
+
+# 只看最近 100 行
+tail -n 100 .data/logs/service.log
+```
+
+关键日志类型：
+
+- `HTTP request completed`：每个请求的 method、path、status、耗时
+- `Outbound chat payload`：真正发送给模型的完整 payload
+- `Recovering stale busy session`：自动恢复数据库里残留的 streaming 会话
+- `Unhandled service error` / `Chat stream failed`：服务端异常

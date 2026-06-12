@@ -13,6 +13,7 @@ import {
   getSummary,
   incrementMessageCount,
   listSessions,
+  updateSessionConfig,
   upsertSummary,
 } from "../session-store.js";
 
@@ -148,6 +149,22 @@ describe("Session Store", () => {
       await incrementMessageCount(session.id);
       const updated = await getSession(session.id);
       expect(updated?.messageCount).toBe(1);
+    });
+  });
+
+  describe("updateSessionConfig", () => {
+    it("更新会话的 provider、model 和 systemPrompt", async () => {
+      const session = await createSession({ model: "llama3.2", provider: "ollama" });
+
+      const updated = await updateSessionConfig(session.id, {
+        provider: "ollama",
+        model: "llama3.2:latest",
+        systemPrompt: "be precise",
+      });
+
+      expect(updated?.provider).toBe("ollama");
+      expect(updated?.model).toBe("llama3.2:latest");
+      expect(updated?.systemPrompt).toBe("be precise");
     });
   });
 });

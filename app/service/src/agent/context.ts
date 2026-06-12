@@ -17,7 +17,6 @@ const DEFAULT_MAX_TOKENS = 128_000;
 
 export async function buildContext(
   sessionId: string,
-  newMessage: NormalizedMessage,
   maxTokens: number = DEFAULT_MAX_TOKENS,
 ): Promise<ContextWindow> {
   const session = await getSession(sessionId);
@@ -33,8 +32,6 @@ export async function buildContext(
     content: JSON.parse(m.content) as NormalizedMessage["content"],
   }));
 
-  const allMessages = [...historyMessages, newMessage];
-
   // 计算总 token
   let systemTokens = 0;
   if (session.systemPrompt) {
@@ -42,7 +39,7 @@ export async function buildContext(
   }
 
   let messageTokens = 0;
-  for (const msg of allMessages) {
+  for (const msg of historyMessages) {
     messageTokens += estimateMessageTokens(msg);
   }
 
@@ -53,7 +50,7 @@ export async function buildContext(
     return {
       systemPrompt: session.systemPrompt,
       summary: null,
-      messages: allMessages,
+      messages: historyMessages,
       totalTokens,
     };
   }
@@ -65,15 +62,15 @@ export async function buildContext(
   // 从后往前保留最近消息
   const recentMessages: NormalizedMessage[] = [];
   let recentTokens = 0;
-  for (let i = allMessages.length - 1; i >= 0; i--) {
-    const tokens = estimateMessageTokens(allMessages[i]);
+  for (let i = historyMessages.length - 1; i >= 0; i--) {
+    const tokens = estimateMessageTokens(historyMessages[i]);
     if (recentTokens + tokens > keepTokenBudget) break;
-    recentMessages.unshift(allMessages[i]);
+    recentMessages.unshift(historyMessages[i]);
     recentTokens += tokens;
   }
 
   // 旧消息用于生成摘要
-  const oldMessages = allMessages.slice(0, allMessages.length - recentMessages.length);
+  const oldMessages = historyMessages.slice(0, historyMessages.length - recentMessages.length);
   const oldSummaryText = existingSummary?.content ?? null;
 
   // 调用 LLM 生成新摘要

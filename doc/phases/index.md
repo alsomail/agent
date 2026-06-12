@@ -40,6 +40,7 @@
   - ✅ 会话恢复与多轮上下文验证
 - 🚧 Phase 3：工具/能力插件系统（当前实现）
   - 🔜 Tool Registry 与工具执行器接口
+  - 🔜 模型能力探测、缓存与 tools 加载策略
   - 🔜 Anthropic tool_use 增量解析与 Agent Loop
   - 🔜 内置工具与工具调用 UI
   - 🔜 工具调用单元测试与端到端验证
@@ -47,6 +48,6 @@
 ## 下一步
 
 - Phase 3：工具/能力插件系统
-  - 先补齐 `@myagent/protocol` 的可序列化工具契约，并运行 `./app/codegen.sh build`
-  - 再实现服务端内部工具类型、Tool Registry、Agent Loop 与 Provider 工具映射
-  - 最后接入前端工具调用展示，并按 Phase 3 场景清单完成端到端验证
+  - 先补齐 `@myagent/protocol` 的可序列化工具契约和模型能力契约，并运行 `./app/codegen.sh build`
+  - 再实现模型能力缓存/探测、服务端内部工具类型、Tool Registry、Agent Loop 与 Provider 工具映射
+  - 最后接入前端能力提示和工具调用展示，并按 Phase 3 场景清单完成端到端验证

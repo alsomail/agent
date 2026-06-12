@@ -167,7 +167,124 @@ Ollama 流式格式是 NDJSON，不是 SSE。工具调用通常以 `message.tool
 
 ---
 
-## 5. Agent Loop 工具循环
+## 5. 模型能力探测与缓存
+
+Ollama 的 `/api/chat` 接受 `tools` 字段，不等于每个本地模型都能稳定产生真实 `tool_calls`。有些模型会在文本里表达工具意图，例如"我应该调用 current_time"，但不会返回结构化工具调用。Phase 3 必须把"模型是否支持工具"作为可查询、可缓存的能力，而不是在 Agent Loop 中事后猜测。
+
+能力判断分三层，不能混用：
+
+| 层级 | 作用 | 可信度 |
+|------|------|--------|
+| 静态身份 | 从模型列表和模型详情读取 `name`、`model`、`digest`、`modified_at`、模板/Modelfile 哈希 | 只能判断缓存是否仍有效 |
+| 静态分析 | 服务端显式读取或探测 TEMPLATE / Modelfile，判断是否疑似具备 tools 模板 | 辅助信号，不能证明运行时可用 |
+| 运行时探测 | 用最小工具定义向模型发起一次确定性探测，观察是否返回真实 `tool_calls` | Phase 3 判定 `supported` 的主要依据 |
+
+外部 Agent 或模型不能被假定为自动理解 TEMPLATE 语义。即使 Modelfile 中出现工具相关模板，也只能标记为静态分析命中，仍需要运行时探测确认。
+
+### 5.1 协议边界
+
+跨端契约唯一来源是 [app/protocol/src/model.ts](../../app/protocol/src/model.ts)：
+
+- `ModelIdentitySchema` 描述模型身份指纹。
+- `ModelCapabilitiesSchema` 描述模型能力结果。
+- `ModelToolCapabilitySchema` 描述 tools 支持状态。
+- `ModelCapabilityProbeRequestSchema` / `ModelCapabilityResponseSchema` 描述探测 API。
+
+Phase 文档、服务端实现和前端 UI 只能引用这些类型，不能复制字段定义。
+
+### 5.2 模型身份指纹
+
+缓存键必须包含 provider 和模型名，并尽量纳入 Ollama 可获得的稳定身份特征：
+
+| 来源 | 建议字段 | 说明 |
+|------|----------|------|
+| `/api/tags` | `name`、`model`、`digest`、`modified_at`、`details` | `digest` 变化时必须视为新模型 |
+| 模型详情/显式读取 | TEMPLATE hash、Modelfile hash | 读取不到时允许为空，但不能伪造 |
+| 服务端派生 | `detailsHash` | 对 details 做稳定 JSON 序列化后哈希，用于捕捉量化/家族变化 |
+
+有效缓存的匹配条件：
+
+1. `provider` 与 `name` 完全一致。
+2. 如果新旧记录都有 `digest`，必须相等。
+3. 如果新旧记录都有 `modifiedAt`，必须相等。
+4. 如果 template/modelfile/details hash 任一可用且发生变化，缓存失效。
+
+字段缺失时不能反向证明模型未变化，只能降低置信度并依赖 TTL 或手动刷新。
+
+### 5.3 探测状态
+
+tools 支持状态使用 protocol 中的 `ModelToolSupportStatus`：
+
+| 状态 | 含义 | 工具加载策略 |
+|------|------|--------------|
+| `unknown` | 尚无有效缓存或身份不足 | 默认不自动加载工具；UI 显示待探测 |
+| `probing` | 正在探测 | 禁止重复探测；UI 显示进行中 |
+| `supported` | 运行时返回了真实 `tool_calls` | Agent Loop 可传入 Tool Registry 定义 |
+| `unsupported` | 模型只返回文本或明确不支持工具 | Agent Loop 不传入 tools |
+| `unstable` | 出现工具意图文本但没有真实 tool_calls，或多次探测结果不一致 | Agent Loop 不传入 tools；UI 提示不稳定 |
+| `error` | 探测请求失败或 Provider 不可达 | 不使用缓存结论；允许用户重试 |
+
+检测到文本工具意图但没有结构化工具调用时，服务端应保留现有日志语义：`Tool intent detected without actual tool call`，并把该次探测结果记为 `unstable` 或降低置信度。
+
+### 5.4 数据库缓存
+
+建议新增 `model_capability_cache` 表，按模型身份缓存探测结果。表结构属于服务端实现细节，不进入 protocol，但必须能映射到 `ModelCapabilities`。
+
+建议列：
+
+| 列 | 说明 |
+|----|------|
+| `id` | 主键 |
+| `provider`、`name`、`model` | 基础身份 |
+| `digest`、`modified_at`、`template_hash`、`modelfile_hash`、`details_hash` | 身份指纹 |
+| `tools_status`、`tools_confidence`、`tools_reason` | tools 能力结论 |
+| `source` | `none`、`static_analysis`、`runtime_probe`、`manual_refresh` 或返回给客户端时的 `cache` |
+| `probe_prompt_version` | 探测提示版本，提示变化时缓存失效 |
+| `detected_at`、`expires_at`、`last_probe_error` | 生命周期与错误信息 |
+
+失效策略：
+
+- 身份指纹变化：立即失效。
+- `probe_prompt_version` 变化：立即失效。
+- `supported` / `unsupported` 默认 TTL 7 天。
+- `unstable` / `error` 默认 TTL 1 天。
+- 用户手动刷新必须绕过缓存并更新 `source=manual_refresh`。
+
+并发策略：
+
+- 同一 `provider + name + identity fingerprint` 同时只允许一个运行时探测。
+- 其他请求读取旧的未过期缓存；若没有缓存，返回 `probing`。
+- 探测完成后以新对象/新行更新，不在内存中原地修改共享对象。
+
+### 5.5 工具加载策略
+
+Chat 路由进入 Agent Loop 前先查询模型能力：
+
+1. `supported`：传入 Tool Registry 的 `definitions()`。
+2. `unsupported` / `unstable`：不传入 tools；模型按纯文本聊天。
+3. `unknown`：不隐式触发每次聊天探测；除非用户在 UI 触发探测，否则不传入 tools。
+4. `error`：不传入 tools，并向 UI 暴露可见状态。
+
+这个策略避免把工具定义塞给不支持或不稳定的模型，也避免每次聊天都产生额外模型调用。
+
+### 5.6 前端展示模型能力
+
+模型选择器在用户选择模型后展示 tools 支持状态：
+
+| 状态 | UI 行为 |
+|------|---------|
+| `unknown` | 显示"待探测"，提供刷新/探测按钮 |
+| `probing` | 显示进行中，禁用重复触发 |
+| `supported` | 显示 tools 可用，聊天可使用工具能力 |
+| `unsupported` | 显示 tools 不支持，禁用工具能力提示 |
+| `unstable` | 显示 tools 不稳定，禁用工具能力并提示纯文本模式 |
+| `error` | 显示错误和重试入口 |
+
+前端不能根据模型名称硬编码能力，也不能在模型列表未加载时用不存在的默认模型创建会话。
+
+---
+
+## 6. Agent Loop 工具循环
 
 Agent Loop 是工具系统的编排层。
 
@@ -199,7 +316,7 @@ streaming
 
 ---
 
-## 6. 消息持久化
+## 7. 消息持久化
 
 工具调用必须进入会话历史，否则下一轮模型看不到刚才执行过什么。
 
@@ -223,7 +340,7 @@ user:
 
 ---
 
-## 7. 前端展示模型
+## 8. 前端展示模型
 
 前端只消费 `StreamEvent`：
 
@@ -245,7 +362,7 @@ user:
 
 ---
 
-## 8. 错误处理策略
+## 9. 错误处理策略
 
 | 错误 | 处理方式 |
 |------|----------|
@@ -260,4 +377,3 @@ user:
 
 - 工具业务错误：工具执行成功返回了失败结果，用 `tool_result.isError=true`
 - 系统级错误：Provider 断流、数据库失败、Abort 之外的未预期异常，用 `error` + `state_change:error`
-

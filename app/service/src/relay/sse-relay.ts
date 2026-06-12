@@ -7,15 +7,18 @@ export function mapToClientEvent(event: NormalizedStreamEvent): StreamEvent | nu
     case "text_delta":
       return { type: "text_delta", text: event.text };
 
-    case "message_delta":
-      // 仅 end_turn 时通知客户端流完成
-      if (event.stopReason === "end_turn") {
-        return { type: "state_change", state: "completed" };
-      }
-      return null;
-
     case "message_stop":
       // message_stop 时不发事件——等 chat 路由统一发 done
+      return null;
+
+    case "content_block_start":
+      if (event.blockType === "tool_use" && event.toolCall) {
+        return {
+          type: "tool_call_start",
+          toolCallId: event.toolCall.id,
+          toolName: event.toolCall.name,
+        };
+      }
       return null;
 
     case "error":
@@ -28,7 +31,7 @@ export function mapToClientEvent(event: NormalizedStreamEvent): StreamEvent | nu
 
     // 以下事件 Phase 1 不转发
     case "message_start":
-    case "content_block_start":
+    case "message_delta":
     case "content_block_stop":
     case "tool_call_delta":
       return null;

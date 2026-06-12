@@ -1,4 +1,4 @@
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 // ─── sessions 表 ───
 
@@ -38,4 +38,26 @@ export const summaries = sqliteTable("summaries", {
   tokenCount: integer("token_count"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
+});
+
+// ─── model_capability_cache 表 ───
+
+export const modelCapabilityCache = sqliteTable("model_capability_cache", {
+  id: text("id").primaryKey(),
+  provider: text("provider").notNull(),
+  name: text("name").notNull(),
+  model: text("model"),
+  digest: text("digest"),
+  modifiedAt: text("modified_at"),
+  templateHash: text("template_hash"),
+  modelfileHash: text("modelfile_hash"),
+  detailsHash: text("details_hash"),
+  toolsStatus: text("tools_status").notNull(),
+  toolsConfidence: real("tools_confidence").notNull(),
+  toolsReason: text("tools_reason"),
+  source: text("source").notNull(),
+  probePromptVersion: text("probe_prompt_version").notNull(),
+  detectedAt: text("detected_at"),
+  expiresAt: text("expires_at"),
+  lastProbeError: text("last_probe_error"),
 });

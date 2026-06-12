@@ -1,3 +1,4 @@
+import type { ToolDefinition } from "@myagent/protocol";
 import type { NormalizedMessage } from "./message.js";
 import type { NormalizedStreamEvent } from "./normalized.js";
 
@@ -11,6 +12,7 @@ export interface LLMStreamParams {
   messages: NormalizedMessage[];
   maxTokens: number;
   system?: string;
+  tools?: ToolDefinition[];
   signal?: AbortSignal;
 }
 

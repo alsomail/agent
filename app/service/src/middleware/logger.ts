@@ -1,4 +1,5 @@
 import { createMiddleware } from "hono/factory";
+import { logger } from "../utils/logger.js";
 
 export const loggerMiddleware = createMiddleware(async (c, next) => {
   const start = Date.now();
@@ -8,5 +9,10 @@ export const loggerMiddleware = createMiddleware(async (c, next) => {
   await next();
 
   const duration = Date.now() - start;
-  console.log(`[${method}] ${path} - ${c.res.status} (${duration}ms)`);
+  logger.info("HTTP request completed", {
+    method,
+    path,
+    status: c.res.status,
+    durationMs: duration,
+  });
 });

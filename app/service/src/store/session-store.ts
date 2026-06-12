@@ -1,4 +1,4 @@
-import type { Session, SessionListItem, StoredMessage } from "@myagent/protocol";
+import type { LLMProvider, Session, SessionListItem, StoredMessage } from "@myagent/protocol";
 import { and, desc, eq } from "drizzle-orm";
 import { getDb } from "../db/index.js";
 import { messages, sessions, summaries } from "../db/schema.js";
@@ -7,7 +7,7 @@ import { messages, sessions, summaries } from "../db/schema.js";
 
 export async function createSession(params: {
   model: string;
-  provider: string;
+  provider: LLMProvider;
   systemPrompt?: string;
 }): Promise<Session> {
   const db = getDb();
@@ -47,7 +47,7 @@ export async function getSession(
   return {
     id: row.id,
     model: row.model,
-    provider: row.provider,
+    provider: row.provider as LLMProvider,
     state: row.state as Session["state"],
     messageCount: row.messageCount,
     createdAt: row.createdAt,
@@ -59,6 +59,48 @@ export async function getSession(
 export async function deleteSession(id: string): Promise<void> {
   const db = getDb();
   db.delete(sessions).where(eq(sessions.id, id)).run();
+}
+
+export async function updateSessionConfig(
+  id: string,
+  params: {
+    model?: string;
+    provider?: LLMProvider;
+    systemPrompt?: string;
+  },
+): Promise<(Session & { systemPrompt?: string }) | null> {
+  const db = getDb();
+  const existing = db.select().from(sessions).where(eq(sessions.id, id)).get();
+
+  if (!existing) {
+    return null;
+  }
+
+  const nextModel = params.model ?? existing.model;
+  const nextProvider = params.provider ?? existing.provider;
+  const nextSystemPrompt = params.systemPrompt ?? existing.systemPrompt ?? null;
+  const updatedAt = new Date().toISOString();
+
+  db.update(sessions)
+    .set({
+      model: nextModel,
+      provider: nextProvider,
+      systemPrompt: nextSystemPrompt,
+      updatedAt,
+    })
+    .where(eq(sessions.id, id))
+    .run();
+
+  return {
+    id: existing.id,
+    model: nextModel,
+    provider: nextProvider as LLMProvider,
+    state: existing.state as Session["state"],
+    messageCount: existing.messageCount,
+    createdAt: existing.createdAt,
+    updatedAt,
+    systemPrompt: nextSystemPrompt ?? undefined,
+  };
 }
 
 export async function listSessions(): Promise<SessionListItem[]> {
@@ -91,7 +133,7 @@ export async function listSessions(): Promise<SessionListItem[]> {
       createdAt: s.createdAt,
       updatedAt: s.updatedAt,
       model: s.model,
-      provider: s.provider,
+      provider: s.provider as LLMProvider,
       messageCount: s.messageCount,
       title,
     });

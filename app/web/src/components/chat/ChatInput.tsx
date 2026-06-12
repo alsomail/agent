@@ -3,9 +3,10 @@ import { useState } from "react";
 interface Props {
   onSend: (content: string) => void;
   disabled: boolean;
+  status?: "idle" | "streaming" | "tool_executing" | "completed" | "error" | "aborted";
 }
 
-export default function ChatInput({ onSend, disabled }: Props) {
+export default function ChatInput({ onSend, disabled, status = "idle" }: Props) {
   const [value, setValue] = useState("");
 
   const handleSend = () => {
@@ -61,7 +62,7 @@ export default function ChatInput({ onSend, disabled }: Props) {
           whiteSpace: "nowrap",
         }}
       >
-        {disabled ? "..." : "发送"}
+        {disabled ? (status === "tool_executing" ? "工具执行中" : "发送中") : "发送"}
       </button>
     </div>
   );

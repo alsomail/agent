@@ -4,6 +4,8 @@
 
 本目录定义前后端共享的 Zod Schema 和 TypeScript 类型。作为协议层，确保前后端对数据结构有统一的理解。
 
+当前运行时协议只允许 `ollama` 和 `anthropic` 两个 Provider。OpenAI 是后续扩展槽，完成 Provider 实现前不进入会话创建/更新协议。
+
 ## 文件职责
 
 | 文件 | 职责 |
@@ -11,9 +13,9 @@
 | `agent-state.ts` | Agent 状态枚举 (`idle`, `streaming`, `tool_executing`, `completed`, `error`, `aborted`) |
 | `api.ts` | API 统一响应信封 (`{ success, data?, error? }`)，错误码枚举 |
 | `health.ts` | 健康检查响应格式 |
-| `model.ts` | 模型信息相关 Schema：模型条目、模型列表查询参数、模型列表响应 |
+| `model.ts` | 模型信息相关 Schema：模型条目、模型身份指纹、模型能力探测请求/响应 |
 | `provider.ts` | Provider 信息相关 Schema：Provider 条目（id/name/available）、Provider 列表响应 |
-| `session.ts` | 会话相关 Schema：创建会话请求（含 model/provider）、会话信息结构 |
+| `session.ts` | 会话相关 Schema：创建/更新会话请求（含 model/provider）、会话信息结构 |
 | `message.ts` | 消息相关 Schema：内容块（文本/工具调用/工具结果）、消息结构、发送消息请求 |
 | `stream-event.ts` | SSE 流事件 Schema：客户端接收的所有事件类型定义 |
 | `tool.ts` | 工具相关 Schema：工具定义、JSON Schema 参数、工具调用、工具结果 |
@@ -32,6 +34,21 @@
 | `ToolResultSchema` | 工具执行结果 | `toolUseId`、`content`、`isError` |
 
 运行时工具执行器（`execute` 函数、AbortSignal、日志上下文）不属于 protocol，必须放在 `app/service/src/tools/`。
+
+## 模型能力协议
+
+模型能力协议的代码唯一来源是 `src/model.ts`。它用于模型列表、模型身份指纹、tools 支持状态和能力探测 API。
+
+| Schema | 作用 |
+|--------|------|
+| `ModelInfoSchema` | 模型列表条目，允许携带 Ollama identity 元数据 |
+| `ModelIdentitySchema` | 模型身份指纹，用于判断缓存是否仍有效 |
+| `ModelToolCapabilitySchema` | tools 支持状态、来源、置信度和错误摘要 |
+| `ModelCapabilitiesSchema` | 单个模型的能力结果 |
+| `ModelCapabilityProbeRequestSchema` | 手动探测/刷新请求 |
+| `ModelCapabilityResponseSchema` | 能力查询或探测响应 |
+
+数据库表结构、运行时探测 prompt、并发锁和 TTL 策略属于服务端实现与架构设计，不属于 protocol；详见 [工具系统架构](../../doc/architecture/tool-system.md#5-模型能力探测与缓存)。
 
 ## SSE 事件类型
 
@@ -52,9 +69,12 @@
 | `GET` | `/api/health` | 响应: `HealthResponse { status, uptime, timestamp }` |
 | `POST` | `/api/session` | 请求: `CreateSessionRequest { systemPrompt?, model?, provider? }` / 响应: `Session` |
 | `GET` | `/api/session/:id` | 响应: `Session` |
+| `PATCH` | `/api/session/:id` | 请求: `UpdateSessionRequest { systemPrompt?, model?, provider? }` / 响应: `Session` |
 | `DELETE` | `/api/session/:id` | 响应: `null` |
 | `GET` | `/api/providers` | 响应: `{ providers: ProviderInfo[] }` |
 | `GET` | `/api/models?provider=ollama` | 响应: `{ models: ModelInfo[] }` |
+| `GET` | `/api/model-capabilities?provider=ollama&model=...` | 响应: `ModelCapabilityResponse` |
+| `POST` | `/api/model-capabilities/probe` | 请求: `ModelCapabilityProbeRequest` / 响应: `ModelCapabilityResponse` |
 | `POST` | `/api/session/:id/chat` | 请求: `SendMessageRequest { content: string }` / 响应: SSE 流 (`StreamEvent`) |
 
 所有端点返回统一信封格式：

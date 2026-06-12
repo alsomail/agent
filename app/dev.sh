@@ -3,6 +3,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+WEB_PORT="${WEB_PORT:-5173}"
+SERVICE_PORT="${PORT:-3001}"
 
 echo "====================================="
 echo "  🤖 MyAgent 开发环境启动"
@@ -33,9 +35,10 @@ pnpm --filter @myagent/protocol build
 
 echo ""
 echo "🚀 启动服务..."
-echo "   前端: http://localhost:5173"
-echo "   后端: http://localhost:3001"
-echo "   健康检查: http://localhost:3001/api/health"
+echo "   前端: http://localhost:${WEB_PORT}"
+echo "   前端(LAN): http://<本机局域网IP>:${WEB_PORT}"
+echo "   后端: http://localhost:${SERVICE_PORT}"
+echo "   健康检查: http://localhost:${SERVICE_PORT}/api/health"
 echo ""
 
 # 并行启动，任一崩溃则全部停止
@@ -44,5 +47,5 @@ exec npx concurrently \
   --names "web,svc" \
   --prefix-colors "cyan,magenta" \
   --prefix "[{name}]" \
-  "pnpm --filter @myagent/web dev" \
-  "pnpm --filter @myagent/service dev"
+  "VITE_API_PROXY_TARGET=http://localhost:${SERVICE_PORT} pnpm --filter @myagent/web dev --host 0.0.0.0 --port ${WEB_PORT}" \
+  "PORT=${SERVICE_PORT} pnpm --filter @myagent/service dev"

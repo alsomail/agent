@@ -36,4 +36,31 @@ export function runMigrations(db: DrizzleDB): void {
       updated_at TEXT NOT NULL
     )
   `);
+
+  db.run(sql`
+    CREATE TABLE IF NOT EXISTS model_capability_cache (
+      id TEXT PRIMARY KEY,
+      provider TEXT NOT NULL,
+      name TEXT NOT NULL,
+      model TEXT,
+      digest TEXT,
+      modified_at TEXT,
+      template_hash TEXT,
+      modelfile_hash TEXT,
+      details_hash TEXT,
+      tools_status TEXT NOT NULL,
+      tools_confidence REAL NOT NULL,
+      tools_reason TEXT,
+      source TEXT NOT NULL,
+      probe_prompt_version TEXT NOT NULL,
+      detected_at TEXT,
+      expires_at TEXT,
+      last_probe_error TEXT
+    )
+  `);
+
+  db.run(sql`
+    CREATE INDEX IF NOT EXISTS idx_model_capability_cache_provider_name
+    ON model_capability_cache(provider, name)
+  `);
 }

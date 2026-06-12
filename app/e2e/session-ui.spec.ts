@@ -1,4 +1,14 @@
-import { expect, test } from "@playwright/test";
+import { type APIRequestContext, expect, test } from "@playwright/test";
+
+async function getAvailableOllamaModel(request: APIRequestContext): Promise<string | null> {
+  const response = await request.get("http://localhost:3001/api/models?provider=ollama");
+  if (!response.ok()) {
+    return null;
+  }
+
+  const body = (await response.json()) as { models?: Array<{ name: string }> };
+  return body.models?.[0]?.name ?? null;
+}
 
 test.describe("会话管理 UI", () => {
   test("页面加载后显示侧边栏", async ({ page }) => {
@@ -15,6 +25,13 @@ test.describe("会话管理 UI", () => {
 
   test("点击新建会话创建新条目", async ({ page }) => {
     await page.goto("/");
+
+    // 如果本机没有可用 Ollama/Anthropic 模型，UI 会明确提示错误而不是创建会话。
+    const initialError = page.getByText(/未找到可用模型|没有可用 Provider|请先选择一个模型/);
+    if (await initialError.isVisible().catch(() => false)) {
+      await expect(initialError).toBeVisible();
+      return;
+    }
 
     const newBtn = page.getByText("+ 新建会话");
     await newBtn.click();
@@ -50,7 +67,7 @@ test.describe("API 端点契约", () => {
     const response = await request.get(`${API}/api/health`);
     expect(response.ok()).toBeTruthy();
     const body = await response.json();
-    expect(body.success).toBe(true);
+    expect(body.status).toBe("ok");
   });
 
   test("GET /api/session 返回数组", async ({ request }) => {
@@ -62,20 +79,26 @@ test.describe("API 端点契约", () => {
   });
 
   test("POST /api/session 创建成功", async ({ request }) => {
+    const model = await getAvailableOllamaModel(request);
+    test.skip(!model, "当前环境没有可用 Ollama 模型");
+
     const response = await request.post(`${API}/api/session`, {
-      data: { model: "test-model", provider: "ollama" },
+      data: { model, provider: "ollama" },
     });
     expect(response.ok()).toBeTruthy();
     const body = await response.json();
     expect(body.success).toBe(true);
     expect(body.data.id).toBeTruthy();
-    expect(body.data.model).toBe("test-model");
+    expect(body.data.model).toBe(model);
   });
 
   test("GET /api/session/:id/messages 返回空数组", async ({ request }) => {
+    const model = await getAvailableOllamaModel(request);
+    test.skip(!model, "当前环境没有可用 Ollama 模型");
+
     // 先创建会话
     const create = await request.post(`${API}/api/session`, {
-      data: { model: "test-model", provider: "ollama" },
+      data: { model, provider: "ollama" },
     });
     const sessionId = (await create.json()).data.id;
 
@@ -85,5 +108,24 @@ test.describe("API 端点契约", () => {
     const body = await response.json();
     expect(body.success).toBe(true);
     expect(Array.isArray(body.data)).toBe(true);
+  });
+
+  test("PATCH /api/session/:id 可更新当前会话模型", async ({ request }) => {
+    const model = await getAvailableOllamaModel(request);
+    test.skip(!model, "当前环境没有可用 Ollama 模型");
+
+    const create = await request.post(`${API}/api/session`, {
+      data: { model, provider: "ollama" },
+    });
+    const sessionId = (await create.json()).data.id;
+
+    const response = await request.patch(`${API}/api/session/${sessionId}`, {
+      data: { model },
+    });
+    expect(response.ok()).toBeTruthy();
+    const body = await response.json();
+    expect(body.success).toBe(true);
+    expect(body.data.id).toBe(sessionId);
+    expect(body.data.model).toBe(model);
   });
 });

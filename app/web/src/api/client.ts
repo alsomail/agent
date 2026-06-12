@@ -1,10 +1,12 @@
 import type {
+  ModelCapabilityResponse,
   ModelInfo,
   ProviderInfo,
   Session,
   SessionListItem,
   StoredMessage,
   StreamEvent,
+  UpdateSessionRequest,
 } from "@myagent/protocol";
 
 export async function* streamChat(
@@ -73,6 +75,48 @@ export async function fetchModels(provider: string): Promise<ModelInfo[]> {
   return (body as { models: ModelInfo[] }).models;
 }
 
+export async function fetchModelCapabilities(
+  provider: "ollama",
+  model: string,
+): Promise<ModelCapabilityResponse> {
+  const response = await fetch(
+    `/api/model-capabilities?provider=${encodeURIComponent(provider)}&model=${encodeURIComponent(model)}`,
+  );
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(
+      (body as { error?: { message?: string } })?.error?.message ??
+        `Failed to fetch model capabilities: ${response.status}`,
+    );
+  }
+
+  const body = await response.json();
+  return (body as { data: ModelCapabilityResponse }).data;
+}
+
+export async function probeModelCapabilities(
+  provider: "ollama",
+  model: string,
+): Promise<ModelCapabilityResponse> {
+  const response = await fetch("/api/model-capabilities/probe", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ provider, model, forceRefresh: true }),
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(
+      (body as { error?: { message?: string } })?.error?.message ??
+        `Failed to probe model capabilities: ${response.status}`,
+    );
+  }
+
+  const body = await response.json();
+  return (body as { data: ModelCapabilityResponse }).data;
+}
+
 export async function createSession(provider: string, model: string): Promise<Session> {
   const response = await fetch("/api/session", {
     method: "POST",
@@ -81,7 +125,40 @@ export async function createSession(provider: string, model: string): Promise<Se
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to create session: ${response.status}`);
+    const body = await response.json().catch(() => ({}));
+    throw new Error(
+      (body as { error?: { message?: string } })?.error?.message ??
+        `Failed to create session: ${response.status}`,
+    );
+  }
+
+  const body = await response.json();
+  return (body as { data: Session }).data;
+}
+
+export async function fetchSession(sessionId: string): Promise<Session> {
+  const response = await fetch(`/api/session/${sessionId}`);
+  if (!response.ok) throw new Error(`Failed to fetch session: ${response.status}`);
+  const body = await response.json();
+  return (body as { data: Session }).data;
+}
+
+export async function updateSession(
+  sessionId: string,
+  payload: UpdateSessionRequest,
+): Promise<Session> {
+  const response = await fetch(`/api/session/${sessionId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(
+      (body as { error?: { message?: string } })?.error?.message ??
+        `Failed to update session: ${response.status}`,
+    );
   }
 
   const body = await response.json();

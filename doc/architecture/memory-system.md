@@ -369,11 +369,12 @@ App.tsx
 
 ```
 1. 用户点击侧边栏的某个会话条目
-2. 前端调用 GET /api/session/:id/messages
-3. 返回该会话的完整消息历史
-4. setMessages(loaded) 替换当前 messages 状态
-5. 聊天界面显示该会话的历史消息
-6. 用户继续对话，新消息追加到已有历史
+2. 前端调用 GET /api/session/:id 和 GET /api/session/:id/messages
+3. 返回该会话的 provider/model 和完整消息历史
+4. setSelectedProvider / setSelectedModel 与当前会话同步
+5. setMessages(loaded) 替换当前 messages 状态
+6. 聊天界面显示该会话的历史消息
+7. 用户继续对话，新消息追加到已有历史
 ```
 
 ### 新增 API
@@ -381,6 +382,7 @@ App.tsx
 | 端点 | 用途 |
 |------|------|
 | `GET /api/sessions` | 获取所有会话列表（不含消息体，用于侧边栏） |
+| `PATCH /api/session/:id` | 更新当前会话的 provider/model/systemPrompt |
 | `GET /api/session/:id/messages` | 获取指定会话的消息历史 |
 
 ### useChat 状态扩展

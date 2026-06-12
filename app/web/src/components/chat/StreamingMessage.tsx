@@ -1,10 +1,14 @@
+import type { PendingToolCall } from "../../hooks/useChat.js";
+import ToolCallBlock from "./ToolCallBlock.js";
+
 interface Props {
   text: string;
   isActive: boolean;
+  toolCalls: PendingToolCall[];
 }
 
-export default function StreamingMessage({ text, isActive }: Props) {
-  if (!text && !isActive) return null;
+export default function StreamingMessage({ text, isActive, toolCalls }: Props) {
+  if (!text && !isActive && toolCalls.length === 0) return null;
 
   return (
     <div style={{ display: "flex", justifyContent: "flex-start", marginBottom: 16 }}>
@@ -30,9 +34,19 @@ export default function StreamingMessage({ text, isActive }: Props) {
         >
           🤖 Agent
         </div>
-        <div>
+        <div style={{ marginBottom: toolCalls.length > 0 ? 10 : 0 }}>
           {text}
           {isActive && <span className="cursor-blink">█</span>}
+        </div>
+        <div style={{ display: "grid", gap: 10 }}>
+          {toolCalls.map((toolCall) => (
+            <ToolCallBlock
+              key={toolCall.toolCallId}
+              toolName={toolCall.toolName}
+              partialJson={toolCall.partialJson}
+              status={toolCall.status}
+            />
+          ))}
         </div>
       </div>
     </div>

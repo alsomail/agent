@@ -3,6 +3,7 @@ import { useChat } from "../../hooks/useChat.js";
 import SessionSidebar from "../session/SessionSidebar.js";
 import ChatInput from "./ChatInput.js";
 import MessageList from "./MessageList.js";
+import ModelCapabilityBadge from "./ModelCapabilityBadge.js";
 import ModelSelector from "./ModelSelector.js";
 import ProviderSelector from "./ProviderSelector.js";
 
@@ -11,12 +12,17 @@ export default function ChatContainer() {
     messages,
     isStreaming,
     currentText,
+    pendingToolCalls,
+    agentState,
     error,
     send,
     dismissError,
     providers,
     selectedProvider,
     selectedModel,
+    modelCapabilities,
+    isLoadingModelCapabilities,
+    probeSelectedModelCapabilities,
     setSelectedModel,
     fetchProvidersAndModels,
     handleProviderChange,
@@ -41,7 +47,9 @@ export default function ChatContainer() {
         activeSessionId={sessionId}
         onSelect={switchSession}
         onDelete={deleteSession}
-        onNew={createNewSession}
+        onNew={() => {
+          void createNewSession();
+        }}
       />
 
       {/* 主聊天区域 */}
@@ -76,17 +84,29 @@ export default function ChatContainer() {
               providers={providers}
               selected={selectedProvider}
               onSelect={handleProviderChange}
+              disabled={isStreaming}
             />
             {selectedProvider && (
               <ModelSelector
                 provider={selectedProvider}
                 selected={selectedModel}
                 onSelect={setSelectedModel}
+                disabled={isStreaming}
               />
             )}
+            {selectedProvider === "ollama" && selectedModel ? (
+              <ModelCapabilityBadge
+                capabilities={modelCapabilities}
+                loading={isLoadingModelCapabilities}
+                onProbe={() => {
+                  void probeSelectedModelCapabilities();
+                }}
+                disabled={isStreaming}
+              />
+            ) : null}
           </div>
           <p style={{ fontSize: 13, color: "var(--color-text-secondary)", marginTop: 4 }}>
-            AI Agent Playground — Phase 2
+            当前会话模型设置，修改后立即作用于当前对话
           </p>
         </header>
 
@@ -133,12 +153,17 @@ export default function ChatContainer() {
               flexShrink: 0,
             }}
           >
-            ⏳ Agent 正在思考...
+            {agentState === "tool_executing" ? "🛠️ Agent 正在执行工具..." : "⏳ Agent 正在思考..."}
           </div>
         )}
 
         {/* Message list */}
-        <MessageList messages={messages} currentText={currentText} isStreaming={isStreaming} />
+        <MessageList
+          messages={messages}
+          currentText={currentText}
+          isStreaming={isStreaming}
+          pendingToolCalls={pendingToolCalls}
+        />
 
         {/* Input area */}
         <footer
@@ -148,7 +173,7 @@ export default function ChatContainer() {
             flexShrink: 0,
           }}
         >
-          <ChatInput onSend={send} disabled={isStreaming} />
+          <ChatInput onSend={send} disabled={isStreaming} status={agentState} />
         </footer>
       </div>
     </div>

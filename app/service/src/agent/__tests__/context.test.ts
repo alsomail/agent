@@ -1,5 +1,40 @@
-import { describe, expect, it } from "vitest";
+import Database from "better-sqlite3";
+import { drizzle } from "drizzle-orm/better-sqlite3";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { setTestDb } from "../../db/index.js";
+import { runMigrations } from "../../db/migrate.js";
+import * as schema from "../../db/schema.js";
+import { addMessage, createSession } from "../../store/session-store.js";
+import { buildContext } from "../context.js";
 import { estimateTokenCount } from "../token.js";
+
+describe("buildContext", () => {
+  beforeEach(() => {
+    const sqlite = new Database(":memory:");
+    sqlite.pragma("foreign_keys = ON");
+    const db = drizzle(sqlite, { schema });
+    setTestDb(db);
+    runMigrations(db);
+  });
+
+  afterEach(() => {
+    setTestDb(null as unknown as ReturnType<typeof drizzle>);
+  });
+
+  it("只从已持久化消息构建上下文，不重复追加当前消息", async () => {
+    const session = await createSession({ model: "llama3.2", provider: "ollama" });
+    await addMessage(session.id, "user", JSON.stringify([{ type: "text", text: "查看当前时间" }]));
+
+    const context = await buildContext(session.id);
+
+    expect(context.messages).toEqual([
+      {
+        role: "user",
+        content: [{ type: "text", text: "查看当前时间" }],
+      },
+    ]);
+  });
+});
 
 describe("estimateTokenCount", () => {
   it("纯中文按每字 1 token 计算", () => {

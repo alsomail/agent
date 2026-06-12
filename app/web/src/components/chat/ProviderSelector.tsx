@@ -1,12 +1,18 @@
-import type { ProviderInfo } from "@myagent/protocol";
+import type { LLMProvider, ProviderInfo } from "@myagent/protocol";
 
 interface Props {
   providers: ProviderInfo[];
-  selected: string;
-  onSelect: (providerId: string) => void;
+  selected: LLMProvider;
+  onSelect: (providerId: LLMProvider) => void;
+  disabled?: boolean;
 }
 
-export default function ProviderSelector({ providers, selected, onSelect }: Props) {
+export default function ProviderSelector({
+  providers,
+  selected,
+  onSelect,
+  disabled = false,
+}: Props) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
       <label
@@ -18,7 +24,8 @@ export default function ProviderSelector({ providers, selected, onSelect }: Prop
       <select
         id="provider-select"
         value={selected}
-        onChange={(e) => onSelect(e.target.value)}
+        disabled={disabled}
+        onChange={(e) => onSelect(e.target.value as LLMProvider)}
         style={{
           padding: "4px 8px",
           borderRadius: "var(--radius-sm)",
@@ -27,7 +34,8 @@ export default function ProviderSelector({ providers, selected, onSelect }: Prop
           color: "var(--color-text)",
           fontSize: 13,
           outline: "none",
-          cursor: "pointer",
+          cursor: disabled ? "not-allowed" : "pointer",
+          opacity: disabled ? 0.7 : 1,
         }}
       >
         {providers.map((p) => (

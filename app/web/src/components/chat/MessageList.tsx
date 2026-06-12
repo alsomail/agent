@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import type { ChatMessage } from "../../hooks/useChat.js";
+import type { ChatMessage, PendingToolCall } from "../../hooks/useChat.js";
 import MessageBubble from "./MessageBubble.js";
 import StreamingMessage from "./StreamingMessage.js";
 
@@ -7,15 +7,21 @@ interface Props {
   messages: ChatMessage[];
   currentText: string;
   isStreaming: boolean;
+  pendingToolCalls: PendingToolCall[];
 }
 
-export default function MessageList({ messages, currentText, isStreaming }: Props) {
+export default function MessageList({
+  messages,
+  currentText,
+  isStreaming,
+  pendingToolCalls,
+}: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: scrolling is triggered by prop changes
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, currentText]);
+  }, [messages, currentText, pendingToolCalls]);
 
   if (messages.length === 0 && !isStreaming) {
     return (
@@ -45,7 +51,9 @@ export default function MessageList({ messages, currentText, isStreaming }: Prop
       {messages.map((msg) => (
         <MessageBubble key={msg.id} message={msg} />
       ))}
-      {currentText && <StreamingMessage text={currentText} isActive={isStreaming} />}
+      {(currentText || pendingToolCalls.length > 0) && (
+        <StreamingMessage text={currentText} isActive={isStreaming} toolCalls={pendingToolCalls} />
+      )}
       <div ref={bottomRef} />
     </div>
   );

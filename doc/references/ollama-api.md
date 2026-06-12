@@ -123,7 +123,27 @@ Ollama 流式响应是 **NDJSON**（每行一个完整 JSON，按 `\n` 分割）
 }
 ```
 
-## 3. 与 Anthropic 关键差异
+常见字段：
+
+| 字段 | 说明 |
+|------|------|
+| `name` / `model` | 模型名称 |
+| `digest` | 模型内容摘要 |
+| `modified_at` | 模型最后修改时间 |
+| `details` | family、参数规模、量化级别等模型元数据 |
+
+## 3. 模型详情 API (POST /api/show)
+
+端点：`POST http://localhost:11434/api/show`
+
+请求：
+```json
+{ "model": "llama3.2:latest" }
+```
+
+常见响应字段包括 `modelfile`、`template`、`parameters`、`details`、`model_info`。不同 Ollama 版本返回字段可能有差异，服务端读取时应把缺失字段视为不可用，而不是构造默认值。
+
+## 4. 与 Anthropic 关键差异
 
 | 维度 | Anthropic | Ollama |
 |------|-----------|--------|
