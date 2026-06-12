@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   type ChatMessage,
   applyStreamEvent,
+  createClientId,
   createStreamingState,
   resolveRequestedModel,
   storedMessagesToChatMessages,
@@ -127,5 +128,31 @@ describe("resolveRequestedModel", () => {
 
   it("优先使用明确传入的模型名", () => {
     expect(resolveRequestedModel("llama3.2", "qwen")).toBe("llama3.2");
+  });
+});
+
+describe("createClientId", () => {
+  it("在 crypto.randomUUID 不存在时仍生成客户端 ID", () => {
+    const originalCrypto = globalThis.crypto;
+    Object.defineProperty(globalThis, "crypto", {
+      configurable: true,
+      value: {
+        getRandomValues: (bytes: Uint8Array) => {
+          bytes.fill(1);
+          return bytes;
+        },
+      },
+    });
+
+    try {
+      expect(createClientId()).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+      );
+    } finally {
+      Object.defineProperty(globalThis, "crypto", {
+        configurable: true,
+        value: originalCrypto,
+      });
+    }
   });
 });
