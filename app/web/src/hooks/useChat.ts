@@ -545,10 +545,40 @@ export function useChat() {
     async (content: string) => {
       if (!content.trim() || isStreaming) return;
 
-      const sid = sessionId;
-      if (!sid) {
-        await initialize();
-        return;
+      let targetSessionId = sessionId;
+      if (!targetSessionId) {
+        const model = resolveRequestedModel(undefined, selectedModel);
+        if (!model) {
+          setError("请先选择一个模型");
+          return;
+        }
+
+        try {
+          const session = await createSession(selectedProvider, model);
+          targetSessionId = session.id;
+          setSessionId(session.id);
+          syncSessionSelection(session);
+          setStreamState(createStreamingState());
+          setError(null);
+
+          const updatedList = await loadSessions();
+          if (!updatedList.find((s) => s.id === session.id)) {
+            setSessions((prev) => [
+              {
+                id: session.id,
+                createdAt: session.createdAt,
+                updatedAt: session.updatedAt,
+                model: session.model,
+                provider: session.provider,
+                messageCount: session.messageCount,
+              } as SessionListItem,
+              ...prev,
+            ]);
+          }
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "创建会话失败");
+          return;
+        }
       }
 
       controllerRef.current?.abort();
@@ -573,12 +603,8 @@ export function useChat() {
       setError(null);
 
       try {
-        for await (const event of streamChat(sid, content.trim(), controller.signal)) {
-          if (
-            controller.signal.aborted ||
-            activeRequestRef.current !== requestId ||
-            sessionId !== sid
-          ) {
+        for await (const event of streamChat(targetSessionId, content.trim(), controller.signal)) {
+          if (controller.signal.aborted || activeRequestRef.current !== requestId) {
             break;
           }
 
@@ -603,7 +629,7 @@ export function useChat() {
         setIsStreaming(false);
       }
     },
-    [isStreaming, sessionId, initialize, loadSessions],
+    [isStreaming, sessionId, selectedModel, selectedProvider, syncSessionSelection, loadSessions],
   );
 
   return {
